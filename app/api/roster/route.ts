@@ -1,0 +1,160 @@
+// 파일 위치: app/api/roster/route.ts
+import { NextResponse } from 'next/server';
+import prisma from '@/app/lib/prisma';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const route = searchParams.get('route');
+    const yearMonth = searchParams.get('yearMonth');
+    const year = searchParams.get('year');
+
+    const configRecord = await prisma.monthlyRoster.findUnique({
+      where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+    });
+    const payConfig = (configRecord?.rosterData as any) || { publicRules: [], privateRules: [] };
+
+    const resolvePublicWageForYm = (ym: string, fallback: number) => {
+      const pubRules = payConfig?.publicRules || [];
+      if (pubRules.length === 0) return fallback;
+      const sorted = [...pubRules].sort((a: any, b: any) =>
+        a.startYearMonth.localeCompare(b.startYearMonth)
+      );
+      let matched = fallback;
+      for (const r of sorted) {
+        if (r.startYearMonth <= ym) matched = r.hourlyWage;
+      }
+      return matched;
+    };
+
+    // 연간 통계 탭용 일괄 조회
+    if (route && year && !yearMonth) {
+      const prevYearDec = `${Number(year) - 1}-12`;
+
+      const [rosters, routeInfo, allRoutes, holidaysList, setting] = await Promise.all([
+        prisma.monthlyRoster.findMany({
+          where: {
+            route,
+            OR: [{ yearMonth: { startsWith: `${year}-` } }, { yearMonth: prevYearDec }],
+          },
+          orderBy: { yearMonth: 'asc' },
+        }),
+        prisma.busRoute.findUnique({ where: { name: route } }),
+        prisma.busRoute.findMany({ select: { name: true, routeType: true }, orderBy: { name: 'asc' } }),
+        prisma.holiday.findMany({
+          where: { date: { startsWith: year } },
+          select: { date: true, name: true },
+        }),
+        prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
+      ]);
+
+      const holidayMap: Record<string, string> = {};
+      holidaysList.forEach(h => {
+        holidayMap[h.date] = h.name;
+      });
+      holidayMap[`${year}-05-01`] = '근로자의 날';
+      if (Number(year) >= 2026) {
+        holidayMap[`${year}-07-17`] = '제헌절';
+      }
+
+      return NextResponse.json(
+        {
+          rosters,
+          routeInfo,
+          allRoutes,
+          holidays: holidayMap,
+          defaultHourlyWage: setting?.baseHourlyWage || 16911,
+          payConfig,
+        },
+        { status: 200 }
+      );
+    }
+
+    if (!route || !yearMonth) {
+      return NextResponse.json({ error: 'route와 yearMonth 파라미터가 모두 필요합니다.' }, { status: 400 });
+    }
+
+    const [roster, routeInfo] = await Promise.all([
+      prisma.monthlyRoster.findUnique({
+        where: { route_yearMonth: { route, yearMonth } },
+      }),
+      prisma.busRoute.findUnique({
+        where: { name: route },
+      }),
+    ]);
+
+    if (roster) {
+      return NextResponse.json(
+        { rosterData: roster.rosterData, hourlyWage: roster.hourlyWage, routeInfo, payConfig },
+        { status: 200 }
+      );
+    } else {
+      const setting = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
+      const baseWage = setting?.baseHourlyWage || 16911;
+      const effectiveWage = resolvePublicWageForYm(yearMonth, baseWage);
+      return NextResponse.json(
+        { rosterData: [], hourlyWage: effectiveWage, routeInfo, payConfig },
+        { status: 200 }
+      );
+    }
+  } catch (error) {
+    console.error('배차표 조회 에러:', error);
+    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { action, route, yearMonth, rosterData, hourlyWage } = body;
+
+    if (!route || !yearMonth) {
+      return NextResponse.json({ error: '필수 데이터가 누락되었습니다.' }, { status: 400 });
+    }
+
+    if (action === 'IMPORT_PREVIOUS') {
+      const pastRoster = await prisma.monthlyRoster.findFirst({
+        where: { route, yearMonth: { lt: yearMonth } },
+        orderBy: { yearMonth: 'desc' },
+      });
+
+      if (!pastRoster || !pastRoster.rosterData || (pastRoster.rosterData as any[]).length === 0) {
+        return NextResponse.json({ error: '불러올 이전 배차 데이터가 없습니다.' }, { status: 404 });
+      }
+
+      const pastData = pastRoster.rosterData as any[];
+      // ✨ 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
+      const inheritedBaseData = pastData.map(group => ({
+        ...group,
+        drivers: group.drivers.map((driver: any) => ({
+          ...driver,
+          schedules: {},
+          baseSchedules: {},
+          defaultRestDays: Array.isArray(driver.defaultRestDays) ? driver.defaultRestDays : [],
+        })),
+      }));
+
+      const updatedRoster = await prisma.monthlyRoster.upsert({
+        where: { route_yearMonth: { route, yearMonth } },
+        update: { rosterData: inheritedBaseData, hourlyWage },
+        create: { route, yearMonth, rosterData: inheritedBaseData, hourlyWage },
+      });
+
+      return NextResponse.json(
+        { success: true, rosterData: updatedRoster.rosterData, hourlyWage: updatedRoster.hourlyWage },
+        { status: 200 }
+      );
+    }
+
+    const updatedRoster = await prisma.monthlyRoster.upsert({
+      where: { route_yearMonth: { route, yearMonth } },
+      update: { rosterData, hourlyWage },
+      create: { route, yearMonth, rosterData, hourlyWage },
+    });
+
+    return NextResponse.json({ success: true, rosterData: updatedRoster.rosterData }, { status: 200 });
+  } catch (error) {
+    console.error('배차표 저장 에러:', error);
+    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
+  }
+}

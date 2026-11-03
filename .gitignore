@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 백업용 xml 파일이 Git 및 Repomix 백업에 중복 포함되지 않도록 제외
+*.xml

@@ -1,3 +1,4 @@
+// 파일 위치: prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,4 +6,57 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model SystemSetting {
+  id             String   @id @default("GLOBAL")
+  baseHourlyWage Int      @default(16911)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MonthlyRoster {
+  id          String   @id @default(uuid())
+  route       String   @default("미지정") 
+  yearMonth   String   
+  rosterData  Json     
+  hourlyWage  Int      @default(16911)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([route, yearMonth]) 
+}
+
+model User {
+  id        String   @id @default(uuid())
+  empId     String   @unique 
+  password  String   
+  name      String   
+  birthDate String   @default("000000")
+  route     String   @default("미지정") 
+  role      String   @default("USER") 
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Holiday {
+  id        String   @id @default(uuid())
+  date      String   @unique 
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BusRoute {
+  id           String   @id @default(uuid())
+  name         String   @unique 
+  routeType    String   @default("PUBLIC")
+  weekdayCount Int      @default(0)   
+  satDrops     Int[]    
+  sunDrops     Int[]    
+  // ✨ 긴근무 순번 저장을 위한 배열 데이터 공간 추가!
+  longShifts   String[] @default([])  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
