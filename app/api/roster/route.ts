@@ -2,6 +2,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
 
+const resolvePublicWageForYm = (payConfig: any, ym: string, fallback: number) => {
+  const pubRules = payConfig?.publicRules || [];
+  if (pubRules.length === 0) return fallback;
+  const sorted = [...pubRules].sort((a: any, b: any) =>
+    a.startYearMonth.localeCompare(b.startYearMonth)
+  );
+  let matched = fallback;
+  for (const r of sorted) {
+    if (r.startYearMonth <= ym) matched = r.hourlyWage;
+  }
+  return matched;
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -9,44 +22,38 @@ export async function GET(request: Request) {
     const yearMonth = searchParams.get('yearMonth');
     const year = searchParams.get('year');
 
-    const configRecord = await prisma.monthlyRoster.findUnique({
-      where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
-    });
-    const payConfig = (configRecord?.rosterData as any) || { publicRules: [], privateRules: [] };
-
-    const resolvePublicWageForYm = (ym: string, fallback: number) => {
-      const pubRules = payConfig?.publicRules || [];
-      if (pubRules.length === 0) return fallback;
-      const sorted = [...pubRules].sort((a: any, b: any) =>
-        a.startYearMonth.localeCompare(b.startYearMonth)
-      );
-      let matched = fallback;
-      for (const r of sorted) {
-        if (r.startYearMonth <= ym) matched = r.hourlyWage;
-      }
-      return matched;
-    };
-
-    // 연간 통계 탭용 일괄 조회
+    // 1. 연간 통계 탭용 일괄 조회 (단 1회 병렬 처리)
     if (route && year && !yearMonth) {
       const prevYearDec = `${Number(year) - 1}-12`;
 
-      const [rosters, routeInfo, allRoutes, holidaysList, setting] = await Promise.all([
-        prisma.monthlyRoster.findMany({
-          where: {
-            route,
-            OR: [{ yearMonth: { startsWith: `${year}-` } }, { yearMonth: prevYearDec }],
-          },
-          orderBy: { yearMonth: 'asc' },
-        }),
-        prisma.busRoute.findUnique({ where: { name: route } }),
-        prisma.busRoute.findMany({ select: { name: true, routeType: true }, orderBy: { name: 'asc' } }),
-        prisma.holiday.findMany({
-          where: { date: { startsWith: year } },
-          select: { date: true, name: true },
-        }),
-        prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
-      ]);
+      const [configRecord, rosters, routeInfo, allRoutes, holidaysList, setting] =
+        await Promise.all([
+          prisma.monthlyRoster.findUnique({
+            where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+          }),
+          prisma.monthlyRoster.findMany({
+            where: {
+              route,
+              OR: [{ yearMonth: { startsWith: `${year}-` } }, { yearMonth: prevYearDec }],
+            },
+            orderBy: { yearMonth: 'asc' },
+          }),
+          prisma.busRoute.findUnique({ where: { name: route } }),
+          prisma.busRoute.findMany({
+            select: { name: true, routeType: true },
+            orderBy: { name: 'asc' },
+          }),
+          prisma.holiday.findMany({
+            where: { date: { startsWith: year } },
+            select: { date: true, name: true },
+          }),
+          prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
+        ]);
+
+      const payConfig = (configRecord?.rosterData as any) || {
+        publicRules: [],
+        privateRules: [],
+      };
 
       const holidayMap: Record<string, string> = {};
       holidaysList.forEach(h => {
@@ -71,17 +78,32 @@ export async function GET(request: Request) {
     }
 
     if (!route || !yearMonth) {
-      return NextResponse.json({ error: 'route와 yearMonth 파라미터가 모두 필요합니다.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'route와 yearMonth 파라미터가 모두 필요합니다.' },
+        { status: 400 }
+      );
     }
 
-    const [roster, routeInfo] = await Promise.all([
+    // 2. 월간 배차표 조회 (단 1회 병렬 처리)
+    const [configRecord, roster, routeInfo, setting] = await Promise.all([
+      prisma.monthlyRoster.findUnique({
+        where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+      }),
       prisma.monthlyRoster.findUnique({
         where: { route_yearMonth: { route, yearMonth } },
       }),
       prisma.busRoute.findUnique({
         where: { name: route },
       }),
+      prisma.systemSetting.findUnique({
+        where: { id: 'GLOBAL' },
+      }),
     ]);
+
+    const payConfig = (configRecord?.rosterData as any) || {
+      publicRules: [],
+      privateRules: [],
+    };
 
     if (roster) {
       return NextResponse.json(
@@ -89,9 +111,8 @@ export async function GET(request: Request) {
         { status: 200 }
       );
     } else {
-      const setting = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
       const baseWage = setting?.baseHourlyWage || 16911;
-      const effectiveWage = resolvePublicWageForYm(yearMonth, baseWage);
+      const effectiveWage = resolvePublicWageForYm(payConfig, yearMonth, baseWage);
       return NextResponse.json(
         { rosterData: [], hourlyWage: effectiveWage, routeInfo, payConfig },
         { status: 200 }
@@ -123,7 +144,7 @@ export async function POST(request: Request) {
       }
 
       const pastData = pastRoster.rosterData as any[];
-      // ✨ 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
+      // 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
       const inheritedBaseData = pastData.map(group => ({
         ...group,
         drivers: group.drivers.map((driver: any) => ({
