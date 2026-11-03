@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: '배차메이커 - 버스 승무원 월간 근무 계획표',
     short_name: '배차메이커',
     description: '공공관리제 및 민영제 버스 노선 월간 배차·근무 통계 관리 시스템',
-    start_url: '/main',
+    start_url: '/',
     display: 'standalone',
     orientation: 'landscape',
     background_color: '#f8fafc',
