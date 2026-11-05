@@ -67,6 +67,7 @@ export default function RosterView() {
   const [highlightFilter, setHighlightFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const showToast = useCallback(
     (message: string, type: 'SUCCESS' | 'WARNING' = 'SUCCESS', subMessage?: string) => {
@@ -139,6 +140,23 @@ export default function RosterView() {
     forceEnterLandscape,
     dismissLandscapePrompt,
   } = useMobileViewport();
+
+  // PC 화면 컨테이너 가로 폭을 실시간 감지하여 추가표시 ON/OFF와 무관하게 기본 열 너비를 고정 유지
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const updateWidth = () => {
+      setContainerWidth(el.clientWidth);
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [containerRef]);
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -883,6 +901,31 @@ export default function RosterView() {
 
   const headerRowSpan = showLongShifts && sortedLongShifts.length > 0 && !isPrivate ? 2 : 1;
 
+  // PC 화면에서 추가표시 전(순서~예상급여)이 100% 꽉 차는 날짜 열 너비를 산출하고, 추가표시 클릭 시에도 그대로 고정 유지
+  const isDesktop = containerWidth >= 1024;
+  const leftStickyWidth = 30 + 44 + 62; // 순서(30) + 차번(44) + 성명(62) = 136px
+  const rightStatsCols = isPrivate
+    ? [40, 40, 40, 82] // 합계(40) + 절(40) + 복격(40) + 예상급여(82) = 202px
+    : [34, 28, 28, 34, 36, 32, 32, 34, 78]; // 총근로~예상급여 = 336px
+  const rightStatsWidth = rightStatsCols.reduce((a, b) => a + b, 0);
+
+  const dayColWidth = useMemo(() => {
+    if (!isDesktop || containerWidth <= 0) return 38;
+    const available = containerWidth - leftStickyWidth - rightStatsWidth;
+    return Math.max(28, available / daysInMonth);
+  }, [isDesktop, containerWidth, leftStickyWidth, rightStatsWidth, daysInMonth]);
+
+  const extraColsWidth = useMemo(() => {
+    if (isPrivate || !showLongShifts) return 0;
+    const restCol = 40; // 기본휴무 열
+    const longCols = sortedLongShifts.length > 0 ? sortedLongShifts.length * 34 + 40 : 0;
+    return restCol + longCols;
+  }, [isPrivate, showLongShifts, sortedLongShifts.length]);
+
+  const computedTableWidth = isDesktop
+    ? leftStickyWidth + daysInMonth * dayColWidth + rightStatsWidth + extraColsWidth
+    : undefined;
+
   const handleExportExcel = async () => {
     if (processedRoster.length === 0) {
       showToast('저장할 배차 데이터가 없습니다.', 'WARNING');
@@ -930,19 +973,13 @@ export default function RosterView() {
 
   const cornerActive1 = isModalActive
     ? 'z-[201] bg-white text-blue-800 ring-[3px] ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] rounded-lg'
-    : 'z-50 bg-slate-300 text-slate-800 shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#94a3b8,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569]';
+    : 'z-50 bg-slate-300 text-slate-800 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-400 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600';
   const cornerActive2 = isModalActive
     ? 'z-[201] bg-white text-blue-800 ring-[3px] ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] rounded-lg'
-    : 'z-50 bg-slate-200 text-slate-800 shadow-[inset_-1px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569]';
+    : 'z-50 bg-slate-200 text-slate-800 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600';
   const cornerActive3 = isModalActive
     ? 'z-[201] bg-white text-blue-800 ring-[3px] ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] rounded-lg'
-    : 'z-50 bg-slate-200 text-slate-800 shadow-[inset_-2px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.1)]';
-
-  // thead 상/하단 굵은 가로선 전용 (세로 방향 X-offset을 0으로 두어 tbody의 border-l/r과 어긋나지 않게 함)
-  const thTopBotShadow = 'shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569]';
-
-  // 추가표시가 꺼져 있을 때는 PC(lg 이상)에서 w-full로 화면 가로 폭에 100% 꽉 차게 맞춤
-  const isFitToScreen = !showLongShifts || isPrivate;
+    : 'z-50 bg-slate-200 text-slate-800 border-r-[2px] border-r-slate-400 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600';
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50 font-sans overscroll-none relative">
@@ -994,13 +1031,11 @@ export default function RosterView() {
         />
       )}
 
-      {/* 1. 상단 헤더: 주의 배지가 떠도 좌우 스크롤바가 절대 생기지 않도록 1줄 자동 맞춤 (overflow-hidden) */}
       <header
         className={`flex flex-nowrap items-center justify-between gap-1 xl:gap-1.5 px-2 sm:px-3 py-1.5 xl:py-2 bg-white border-b border-gray-200 shadow-sm shrink-0 relative overflow-hidden ${
           isModalActive ? 'z-[210] pointer-events-none' : 'z-50'
         }`}
       >
-        {/* 좌측 컨트롤 그룹 */}
         <div className="flex items-center flex-nowrap gap-1 xl:gap-1.5 shrink-0">
           <div className="flex items-center bg-white border-[2px] border-slate-200 hover:border-blue-300 rounded-xl shadow-sm p-0.5 transition-colors shrink-0">
             <button
@@ -1080,7 +1115,6 @@ export default function RosterView() {
           </div>
         </div>
 
-        {/* 중앙 제목 및 상태 배지 그룹 (flex-1 min-w-0으로 자동 폭 맞춤) */}
         <div className="flex items-center justify-center gap-1 xl:gap-2 min-w-0 flex-1 px-1">
           <Bus className="text-blue-600 hidden xl:block shrink-0" size={20} strokeWidth={2.5} />
           <h1 className="font-black text-[13px] sm:text-[14.5px] xl:text-[18px] 2xl:text-[20px] leading-none text-gray-800 tracking-tight whitespace-nowrap truncate">
@@ -1127,7 +1161,6 @@ export default function RosterView() {
           )}
         </div>
 
-        {/* 우측 필터 및 기능 버튼 그룹 */}
         <div className="flex items-center flex-nowrap justify-end gap-1 xl:gap-1.5 shrink-0">
           <select
             value={highlightFilter}
@@ -1243,15 +1276,44 @@ export default function RosterView() {
           ref={containerRef}
           className="flex-1 overflow-auto relative touch-pan-x touch-pan-y touch-pinch-zoom shadow-sm"
         >
-          {/* 2. 기본 상태(isFitToScreen)일 때 PC(lg:w-full)에서 화면 가로 크기에 100% 꽉 차게 렌더링 */}
+          {/* border-separate border-spacing-0 적용: 스크롤 시 상/하단 고정행의 열 사이 1px 틈새로 본문 배차/빨간선이 비치는 현상 완전 차단 */}
           <table
-            style={{ zoom: scale } as React.CSSProperties}
+            style={
+              {
+                zoom: scale,
+                width: computedTableWidth ? `${computedTableWidth}px` : undefined,
+              } as React.CSSProperties
+            }
             className={`${
-              isFitToScreen ? 'w-max min-w-full lg:w-full' : 'w-max min-w-full'
-            } border-collapse text-sm table-fixed border-0 border-r-[2.5px] ${
-              isModalActive ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-700'
+              !computedTableWidth ? 'w-max min-w-full' : ''
+            } border-separate border-spacing-0 text-sm table-fixed ${
+              isModalActive ? 'bg-slate-900' : 'bg-white'
             }`}
           >
+            {/* colgroup으로 각 열의 정확한 고정 폭 지정 (추가표시 클릭 시에도 기존 열 너비 100% 유지) */}
+            <colgroup>
+              <col style={{ width: '30px' }} />
+              <col style={{ width: '44px' }} />
+              <col style={{ width: '62px' }} />
+              {!isPrivate && showLongShifts && <col style={{ width: '40px' }} />}
+              {daysArray.map(d => (
+                <col key={`col-day-${d}`} style={{ width: `${dayColWidth}px` }} />
+              ))}
+              {rightStatsCols.map((w, idx) => (
+                <col key={`col-stat-${idx}`} style={{ width: `${w}px` }} />
+              ))}
+              {!isPrivate &&
+                showLongShifts &&
+                sortedLongShifts.length > 0 && (
+                  <>
+                    {sortedLongShifts.map(s => (
+                      <col key={`col-ls-${s}`} style={{ width: '34px' }} />
+                    ))}
+                    <col style={{ width: '40px' }} />
+                  </>
+                )}
+            </colgroup>
+
             <thead
               className={`bg-slate-100 sticky top-0 ${
                 isModalActive ? 'z-[200] pointer-events-none' : 'z-40'
@@ -1260,19 +1322,19 @@ export default function RosterView() {
               <tr className="border-0">
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-0 w-[32px] min-w-[32px] py-1.5 border-0 font-black text-[11px] align-middle px-0.5 leading-tight ${cornerActive1}`}
+                  className={`sticky left-0 w-[30px] py-1.5 font-black text-[11px] align-middle px-0.5 leading-tight ${cornerActive1}`}
                 >
                   {isPrivate ? '조' : '순서'}
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[32px] w-[46px] min-w-[46px] py-2 border-0 font-black text-[13px] align-middle tracking-tighter px-0.5 ${cornerActive2}`}
+                  className={`sticky left-[30px] w-[44px] py-2 font-black text-[12.5px] align-middle tracking-tighter px-0.5 ${cornerActive2}`}
                 >
                   차번
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[78px] w-[68px] min-w-[68px] py-2 border-0 font-black text-[14px] align-middle tracking-tight px-0.5 ${cornerActive3}`}
+                  className={`sticky left-[74px] w-[62px] py-2 font-black text-[13.5px] align-middle tracking-tight px-0.5 ${cornerActive3}`}
                 >
                   성명
                 </th>
@@ -1282,15 +1344,16 @@ export default function RosterView() {
                     rowSpan={headerRowSpan}
                     onClick={handleAutoExtractRestDaysUI}
                     title="클릭 시 미지정(-) 기사의 기본휴무만 자동 설정합니다 (이미 지정된 기본휴무는 유지)"
-                    className={`w-[44px] min-w-[44px] max-w-[44px] py-2 border-r-[2px] border-r-slate-500 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[12px] align-middle leading-tight cursor-pointer transition-colors select-none shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
+                    className={`py-2 border-r-[2px] border-r-slate-500 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[11.5px] align-middle leading-tight cursor-pointer transition-colors select-none ${generalDimClass}`}
                   >
                     기본<br />휴무
                   </th>
                 )}
 
-                {daysArray.map(day => {
+                {daysArray.map((day, idx) => {
                   const dayType = getDayType(year, month, day, holidays);
                   const isToday = todayDay === day;
+                  const isLastDay = idx === daysArray.length - 1;
 
                   let bgClass = isToday ? 'bg-blue-100' : 'bg-white';
                   let dateColor = isToday ? 'text-blue-700' : 'text-slate-800';
@@ -1309,38 +1372,38 @@ export default function RosterView() {
                   const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const isTargetDate = scheduleModalObj?.day === day;
                   const thDimClass = isModalActive && !isTargetDate ? 'opacity-20' : '';
+                  const rightBorderClass = isLastDay
+                    ? 'border-r-[2.5px] border-r-slate-700'
+                    : 'border-r border-r-slate-200';
+
                   const thActiveClass = isTargetDate
                     ? 'z-[201] bg-white ring-[3px] ring-blue-500 shadow-[0_0_20px_5px_rgba(59,130,246,0.8)] scale-[1.15] relative rounded-lg overflow-visible'
                     : isToday
-                    ? 'shadow-[inset_0_2.5px_0_#2563eb,inset_0_-2.5px_0_#2563eb] overflow-hidden'
-                    : `${thTopBotShadow} overflow-hidden`;
+                    ? `${rightBorderClass} border-t-[2.5px] border-t-blue-600 border-b-[2.5px] border-b-blue-600 overflow-hidden`
+                    : `${rightBorderClass} border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 overflow-hidden`;
 
                   return (
                     <th
                       key={day}
                       rowSpan={headerRowSpan}
-                      className={`${
-                        isFitToScreen
-                          ? 'w-[40px] min-w-[40px] lg:w-auto lg:min-w-0 lg:max-w-none'
-                          : 'w-[40px] min-w-[40px] max-w-[40px]'
-                      } py-1.5 border-r border-slate-200 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
+                      className={`py-1.5 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
                     >
-                      <div className="flex flex-col items-center justify-start h-full gap-0.5 pt-0.5 px-0.5 w-full">
-                        <span className={`text-[14px] xl:text-[15px] font-black leading-none ${dateColor}`}>
+                      <div className="flex flex-col items-center justify-start h-full gap-0.5 pt-0.5 px-0 w-full">
+                        <span className={`text-[13.5px] xl:text-[14.5px] font-black leading-none ${dateColor}`}>
                           {day}
                         </span>
-                        <span className={`text-[10.5px] xl:text-[11px] font-bold leading-none ${dowColor}`}>
+                        <span className={`text-[10px] xl:text-[11px] font-bold leading-none ${dowColor}`}>
                           {getDayOfWeekText(day)}
                         </span>
                         {dayType === 'JEOLNAL' && holidays[dateStr] ? (
                           <span
-                            className="text-[9px] font-extrabold text-red-500 tracking-tighter w-full mt-0.5 leading-tight truncate"
+                            className="text-[8.5px] font-extrabold text-red-500 tracking-tighter w-full mt-0.5 leading-tight truncate"
                             title={holidays[dateStr]}
                           >
                             {holidays[dateStr]}
                           </span>
                         ) : isToday ? (
-                          <span className="text-[8.5px] font-black bg-blue-600 text-white px-1 rounded mt-0.5 leading-tight">
+                          <span className="text-[8px] font-black bg-blue-600 text-white px-0.5 rounded mt-0.5 leading-tight">
                             오늘
                           </span>
                         ) : null}
@@ -1349,30 +1412,29 @@ export default function RosterView() {
                   );
                 })}
 
-                {/* 3. 우측 통계 헤더: tbody 및 tfoot과 100% 동일한 border-l / border-r 적용 */}
                 {isPrivate ? (
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-200 text-slate-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       합<br />계
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-r border-rose-100 bg-rose-50 text-rose-700 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-r-[2.5px] border-r-slate-700 bg-purple-100 text-purple-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#c084fc] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-purple-400 bg-purple-100 text-purple-800 font-extrabold text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       복격<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[85px] min-w-[85px] py-2 border-0 bg-slate-700 text-white font-extrabold text-[14px] align-middle shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#1e293b] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[13.5px] align-middle ${generalDimClass}`}
                     >
                       예상급여
                     </th>
@@ -1381,58 +1443,58 @@ export default function RosterView() {
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-200 text-slate-800 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       총<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[32px] min-w-[32px] xl:w-[34px] py-2 border-r border-orange-100 bg-orange-50 text-orange-700 font-extrabold text-[12px] xl:text-[13px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       오<br />전
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[32px] min-w-[32px] xl:w-[34px] py-2 border-r-[2.5px] border-r-slate-700 bg-blue-50 text-blue-700 font-extrabold text-[12px] xl:text-[13px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#60a5fa] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-blue-400 bg-blue-50 text-blue-700 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       오<br />후
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r border-emerald-200 bg-emerald-100 text-emerald-950 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#10b981] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-emerald-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-500 bg-emerald-100 text-emerald-950 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       소정<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r-[2.5px] border-r-slate-700 bg-emerald-50 text-emerald-900 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       고정<br />휴무
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[36px] min-w-[36px] xl:w-[38px] py-2 border-r border-rose-100 bg-rose-50 text-rose-700 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[36px] min-w-[36px] xl:w-[38px] py-2 border-r border-orange-100 bg-orange-50 text-orange-700 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
+                      className={`py-2 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       연장<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r-[2.5px] border-r-slate-700 bg-red-100 text-red-800 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#f87171] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-red-400 bg-red-100 text-red-800 font-extrabold text-[11.5px] xl:text-[12px] align-middle leading-tight ${generalDimClass}`}
                     >
                       추가<br />합계
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[80px] min-w-[80px] xl:w-[84px] py-2 border-0 bg-slate-700 text-white font-extrabold text-[13px] xl:text-[14px] align-middle shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#1e293b] ${generalDimClass}`}
+                      className={`py-2 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[12.5px] xl:text-[13.5px] align-middle ${generalDimClass}`}
                     >
                       예상급여
                     </th>
@@ -1440,7 +1502,7 @@ export default function RosterView() {
                     {!isPrivate && showLongShifts && sortedLongShifts.length > 0 && (
                       <th
                         colSpan={sortedLongShifts.length + 1}
-                        className={`py-1 border-l-[2.5px] border-l-slate-700 border-r-[2.5px] border-r-slate-700 bg-amber-100 text-amber-950 font-extrabold text-[13.5px] align-middle leading-tight text-center shadow-[inset_0_2.5px_0_#334155,inset_0_-1px_0_#fcd34d] ${generalDimClass}`}
+                        className={`py-1 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b border-b-amber-300 bg-amber-100 text-amber-950 font-extrabold text-[13px] align-middle leading-tight text-center ${generalDimClass}`}
                       >
                         긴근무 순번
                       </th>
@@ -1451,18 +1513,16 @@ export default function RosterView() {
 
               {!isPrivate && showLongShifts && sortedLongShifts.length > 0 && (
                 <tr className="border-0">
-                  {sortedLongShifts.map((shift, idx) => (
+                  {sortedLongShifts.map(shift => (
                     <th
                       key={shift}
-                      className={`w-[36px] min-w-[36px] py-1 border-r border-amber-100 bg-amber-50 text-amber-800 font-extrabold text-[13px] align-middle leading-tight text-center shadow-[inset_0_-2.5px_0_#475569] ${
-                        idx === 0 ? 'border-l-[2.5px] border-l-slate-700' : ''
-                      } ${generalDimClass}`}
+                      className={`py-1 border-r border-r-amber-200 border-b-[2.5px] border-b-slate-600 bg-amber-50 text-amber-800 font-extrabold text-[12px] align-middle leading-tight text-center ${generalDimClass}`}
                     >
                       {shift}
                     </th>
                   ))}
                   <th
-                    className={`w-[42px] min-w-[42px] py-1 border-r-[2.5px] border-r-slate-700 bg-amber-200 text-amber-950 font-extrabold text-[13px] align-middle leading-tight text-center shadow-[inset_0_-2.5px_0_#475569] ${generalDimClass}`}
+                    className={`py-1 border-r-[2.5px] border-r-slate-700 border-b-[2.5px] border-b-slate-600 bg-amber-200 text-amber-950 font-extrabold text-[12px] align-middle leading-tight text-center ${generalDimClass}`}
                   >
                     합계
                   </th>
@@ -1470,7 +1530,7 @@ export default function RosterView() {
               )}
             </thead>
 
-            <tbody className="divide-y divide-slate-200">
+            <tbody>
               {isRosterLoading || isLoading ? (
                 <tr>
                   <td
@@ -1739,7 +1799,7 @@ export default function RosterView() {
 
             {!isRosterLoading && !isLoading && processedRoster.length > 0 && (
               <tfoot
-                className={`lg:sticky lg:bottom-[-1px] ${
+                className={`lg:sticky lg:bottom-0 ${
                   isModalActive
                     ? 'z-10 opacity-20 pointer-events-none'
                     : 'z-40 lg:shadow-[0_-4px_12px_rgba(0,0,0,0.08)]'

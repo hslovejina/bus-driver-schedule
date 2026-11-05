@@ -42,48 +42,44 @@ export default function DailySummary({
     return Math.max(0, routeInfo.weekdayCount - drops);
   };
 
-  // 상/하단 가로선만 inset shadow로 처리하고 좌/우 세로선은 실제 border-r / border-l을 사용하여 본문 열과 100% 일치시킴
-  const amRowTopBotShadow = 'shadow-[inset_0_3px_0_#334155,inset_0_-1px_0_#cbd5e1]';
-  const pmRowTopBotShadow = 'shadow-[inset_0_-2px_0_#64748b]';
-  const totalRowTopBotShadow = isPrivate
-    ? 'shadow-[inset_0_3px_0_#334155,inset_0_-3px_0_#334155]'
-    : 'shadow-[inset_0_-3px_0_#334155]';
+  const amTopBotBorder = 'border-t-[2.5px] border-t-slate-700 border-b border-b-slate-300';
+  const pmTopBotBorder = 'border-b-[2px] border-b-slate-500';
+  const totalTopBotBorder = isPrivate
+    ? 'border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-700'
+    : 'border-b-[2.5px] border-b-slate-700';
 
-  // 우측 통계 영역의 세로 구분선들도 상단부터 하단까지 일직선으로 이어지도록 동일 구조로 렌더링
-  const renderTrailingStatCells = (bgClass: string, rowShadow: string) => {
+  const renderTrailingStatCells = (bgClass: string, rowBorderClass: string) => {
     if (isPrivate) {
       return (
         <>
-          <td className={`relative z-40 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 ${bgClass} ${rowShadow}`} />
-          <td className={`relative z-40 border-r border-rose-100 ${bgClass} ${rowShadow}`} />
-          <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowShadow}`} />
-          <td className={`relative z-40 border-0 ${bgClass} ${rowShadow}`} />
+          <td className={`relative z-40 border-r border-r-slate-200 ${bgClass} ${rowBorderClass}`} />
+          <td className={`relative z-40 border-r border-r-rose-100 ${bgClass} ${rowBorderClass}`} />
+          <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
+          <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
         </>
       );
     }
 
     return (
       <>
-        <td className={`relative z-40 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r border-orange-100 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r border-emerald-200 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r border-rose-100 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r border-orange-100 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowShadow}`} />
-        <td className={`relative z-40 border-0 ${bgClass} ${rowShadow}`} />
+        <td className={`relative z-40 border-r border-r-slate-200 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r border-r-orange-100 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r border-r-emerald-200 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r border-r-rose-100 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r border-r-orange-100 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
+        <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
         {showLongShifts && sortedLongShifts.length > 0 && (
           <>
-            {sortedLongShifts.map((shift, idx) => (
+            {sortedLongShifts.map(shift => (
               <td
                 key={shift}
-                className={`relative z-40 border-r border-amber-100 ${
-                  idx === 0 ? 'border-l-[2.5px] border-l-slate-700' : ''
-                } ${bgClass} ${rowShadow}`}
+                className={`relative z-40 border-r border-r-amber-100 ${bgClass} ${rowBorderClass}`}
               />
             ))}
-            <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowShadow}`} />
+            <td className={`relative z-40 border-r-[2.5px] border-r-slate-700 ${bgClass} ${rowBorderClass}`} />
           </>
         )}
       </>
@@ -94,39 +90,41 @@ export default function DailySummary({
     <>
       {!isPrivate && (
         <>
-          {/* 1. 오전 합계 행 */}
-          <tr className="bg-white border-0">
-            <td className="sticky left-0 z-50 bg-white border-0 shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-1px_0_#cbd5e1]"></td>
-            <td className="sticky left-[32px] z-50 bg-white border-0 shadow-[inset_-1px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-1px_0_#cbd5e1]"></td>
-            <td className="sticky left-[78px] z-50 bg-white border-0 text-center py-2 font-black text-orange-600 text-[15px] shadow-[inset_-2px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-1px_0_#cbd5e1]">
+          {/* 1. 오전 합계 행 (100% 불투명 배경 적용) */}
+          <tr className="bg-white">
+            <td className={`sticky left-0 z-50 bg-white border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${amTopBotBorder}`}></td>
+            <td className={`sticky left-[30px] z-50 bg-white border-r border-r-slate-300 ${amTopBotBorder}`}></td>
+            <td className={`sticky left-[74px] z-50 bg-white border-r-[2px] border-r-slate-400 text-center py-1.5 font-black text-orange-600 text-[14px] ${amTopBotBorder}`}>
               오전
             </td>
             {showLongShifts && (
-              <td className={`relative z-40 bg-emerald-50/40 border-r-[2px] border-r-slate-500 ${amRowTopBotShadow}`}></td>
+              <td className={`relative z-40 bg-emerald-50 border-r-[2px] border-r-slate-500 ${amTopBotBorder}`}></td>
             )}
 
-            {daysArray.map(day => {
+            {daysArray.map((day, idx) => {
               const val = dailyStats[day].am;
               const expected = getExpectedCount(day);
               const isIncomplete = expected > 0 && val !== expected;
               const isToday = todayDay === day;
+              const isLastDay = idx === daysArray.length - 1;
+              const rightBorder = isLastDay ? 'border-r-[2.5px] border-r-slate-700' : 'border-r border-r-slate-200';
 
               return (
                 <td
                   key={day}
                   onClick={() => onCellClick?.(day, 'AM')}
                   title={`${day}일 오전 순번 누락·중복 확인 (클릭)`}
-                  className={`relative z-40 text-center py-2 border-r border-slate-200 align-middle cursor-pointer hover:bg-orange-50/80 transition-colors ${
+                  className={`relative z-40 text-center py-1.5 ${rightBorder} align-middle cursor-pointer hover:bg-orange-50 transition-colors ${
                     isToday ? 'bg-blue-50' : 'bg-white'
-                  } ${amRowTopBotShadow}`}
+                  } ${amTopBotBorder}`}
                 >
                   {isIncomplete ? (
-                    <span className="inline-flex items-center justify-center min-w-[24px] h-[22px] px-1 bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[13.5px] xl:text-[14.5px] shadow-sm">
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[21px] px-0.5 bg-red-50 text-red-600 ring-[1.5px] ring-red-500 rounded font-black text-[13px] xl:text-[14px]">
                       {val}
                     </span>
                   ) : (
                     <span
-                      className={`font-black text-[14px] xl:text-[15px] ${
+                      className={`font-black text-[13.5px] xl:text-[14.5px] ${
                         val > 0 ? 'text-orange-600' : 'text-slate-300'
                       }`}
                     >
@@ -136,42 +134,44 @@ export default function DailySummary({
                 </td>
               );
             })}
-            {renderTrailingStatCells('bg-white', amRowTopBotShadow)}
+            {renderTrailingStatCells('bg-white', amTopBotBorder)}
           </tr>
 
-          {/* 2. 오후 합계 행 */}
-          <tr className="bg-white border-0">
-            <td className="sticky left-0 z-50 bg-white border-0 shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_-2px_0_#64748b]"></td>
-            <td className="sticky left-[32px] z-50 bg-white border-0 shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-2px_0_#64748b]"></td>
-            <td className="sticky left-[78px] z-50 bg-white border-0 text-center py-2 font-black text-blue-600 text-[15px] shadow-[inset_-2px_0_0_#cbd5e1,inset_0_-2px_0_#64748b]">
+          {/* 2. 오후 합계 행 (100% 불투명 배경 적용) */}
+          <tr className="bg-white">
+            <td className={`sticky left-0 z-50 bg-white border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${pmTopBotBorder}`}></td>
+            <td className={`sticky left-[30px] z-50 bg-white border-r border-r-slate-300 ${pmTopBotBorder}`}></td>
+            <td className={`sticky left-[74px] z-50 bg-white border-r-[2px] border-r-slate-400 text-center py-1.5 font-black text-blue-600 text-[14px] ${pmTopBotBorder}`}>
               오후
             </td>
             {showLongShifts && (
-              <td className={`relative z-40 bg-emerald-50/40 border-r-[2px] border-r-slate-500 ${pmRowTopBotShadow}`}></td>
+              <td className={`relative z-40 bg-emerald-50 border-r-[2px] border-r-slate-500 ${pmTopBotBorder}`}></td>
             )}
 
-            {daysArray.map(day => {
+            {daysArray.map((day, idx) => {
               const val = dailyStats[day].pm;
               const expected = getExpectedCount(day);
               const isIncomplete = expected > 0 && val !== expected;
               const isToday = todayDay === day;
+              const isLastDay = idx === daysArray.length - 1;
+              const rightBorder = isLastDay ? 'border-r-[2.5px] border-r-slate-700' : 'border-r border-r-slate-200';
 
               return (
                 <td
                   key={day}
                   onClick={() => onCellClick?.(day, 'PM')}
                   title={`${day}일 오후 순번 누락·중복 확인 (클릭)`}
-                  className={`relative z-40 text-center py-2 border-r border-slate-200 align-middle cursor-pointer hover:bg-blue-50/80 transition-colors ${
+                  className={`relative z-40 text-center py-1.5 ${rightBorder} align-middle cursor-pointer hover:bg-blue-50 transition-colors ${
                     isToday ? 'bg-blue-50' : 'bg-white'
-                  } ${pmRowTopBotShadow}`}
+                  } ${pmTopBotBorder}`}
                 >
                   {isIncomplete ? (
-                    <span className="inline-flex items-center justify-center min-w-[24px] h-[22px] px-1 bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[13.5px] xl:text-[14.5px] shadow-sm">
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[21px] px-0.5 bg-red-50 text-red-600 ring-[1.5px] ring-red-500 rounded font-black text-[13px] xl:text-[14px]">
                       {val}
                     </span>
                   ) : (
                     <span
-                      className={`font-black text-[14px] xl:text-[15px] ${
+                      className={`font-black text-[13.5px] xl:text-[14.5px] ${
                         val > 0 ? 'text-blue-600' : 'text-slate-300'
                       }`}
                     >
@@ -181,62 +181,46 @@ export default function DailySummary({
                 </td>
               );
             })}
-            {renderTrailingStatCells('bg-white', pmRowTopBotShadow)}
+            {renderTrailingStatCells('bg-white', pmTopBotBorder)}
           </tr>
         </>
       )}
 
-      {/* 3. 전체 합계 행 */}
-      <tr className="bg-slate-100 border-0">
-        <td
-          className={`sticky left-0 z-50 bg-slate-200 border-0 ${
-            isPrivate
-              ? 'shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-3px_0_#334155]'
-              : 'shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_-3px_0_#334155]'
-          }`}
-        ></td>
-        <td
-          className={`sticky left-[32px] z-50 bg-slate-200 border-0 ${
-            isPrivate
-              ? 'shadow-[inset_-1px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-3px_0_#334155]'
-              : 'shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-3px_0_#334155]'
-          }`}
-        ></td>
-        <td
-          className={`sticky left-[78px] z-50 bg-slate-100 border-0 text-center py-2 font-black text-slate-800 text-[15px] ${
-            isPrivate
-              ? 'shadow-[inset_-2px_0_0_#cbd5e1,inset_0_3px_0_#334155,inset_0_-3px_0_#334155]'
-              : 'shadow-[inset_-2px_0_0_#cbd5e1,inset_0_-3px_0_#334155]'
-          }`}
-        >
+      {/* 3. 전체 합계 행 (100% 불투명 배경 적용) */}
+      <tr className="bg-slate-100">
+        <td className={`sticky left-0 z-50 bg-slate-200 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${totalTopBotBorder}`}></td>
+        <td className={`sticky left-[30px] z-50 bg-slate-200 border-r border-r-slate-300 ${totalTopBotBorder}`}></td>
+        <td className={`sticky left-[74px] z-50 bg-slate-100 border-r-[2px] border-r-slate-400 text-center py-1.5 font-black text-slate-800 text-[14px] ${totalTopBotBorder}`}>
           합계
         </td>
         {!isPrivate && showLongShifts && (
-          <td className={`relative z-40 bg-slate-200/70 border-r-[2px] border-r-slate-500 ${totalRowTopBotShadow}`}></td>
+          <td className={`relative z-40 bg-slate-200 border-r-[2px] border-r-slate-500 ${totalTopBotBorder}`}></td>
         )}
 
-        {daysArray.map(day => {
+        {daysArray.map((day, idx) => {
           const val = dailyStats[day].total;
           const expectedTotal = getExpectedCount(day) * (isPrivate ? 1 : 2);
           const isIncomplete = expectedTotal > 0 && val !== expectedTotal;
           const isToday = todayDay === day;
+          const isLastDay = idx === daysArray.length - 1;
+          const rightBorder = isLastDay ? 'border-r-[2.5px] border-r-slate-700' : 'border-r border-r-slate-300';
 
           return (
             <td
               key={day}
               onClick={() => onCellClick?.(day, 'TOTAL')}
               title={`${day}일 전체 순번 누락·중복 확인 (클릭)`}
-              className={`relative z-40 text-center py-2 border-r border-slate-300 align-middle cursor-pointer hover:bg-slate-200/80 transition-colors ${
+              className={`relative z-40 text-center py-1.5 ${rightBorder} align-middle cursor-pointer hover:bg-slate-200 transition-colors ${
                 isToday ? 'bg-blue-100' : 'bg-slate-100'
-              } ${totalRowTopBotShadow}`}
+              } ${totalTopBotBorder}`}
             >
               {isIncomplete ? (
-                <span className="inline-flex items-center justify-center min-w-[24px] h-[22px] px-1 bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[13.5px] xl:text-[14.5px] shadow-sm">
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[21px] px-0.5 bg-red-50 text-red-600 ring-[1.5px] ring-red-500 rounded font-black text-[13px] xl:text-[14px]">
                   {val}
                 </span>
               ) : (
                 <span
-                  className={`font-black text-[14px] xl:text-[15px] ${
+                  className={`font-black text-[13.5px] xl:text-[14.5px] ${
                     val > 0 ? 'text-slate-800' : 'text-slate-300'
                   }`}
                 >
@@ -246,7 +230,7 @@ export default function DailySummary({
             </td>
           );
         })}
-        {renderTrailingStatCells('bg-slate-100', totalRowTopBotShadow)}
+        {renderTrailingStatCells('bg-slate-100', totalTopBotBorder)}
       </tr>
     </>
   );
