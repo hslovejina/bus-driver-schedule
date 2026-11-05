@@ -8,9 +8,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description: '공공관리제 및 민영제 버스 노선 월간 배차·근무 통계 관리 시스템',
     start_url: '/',
     display: 'standalone',
-    orientation: 'landscape',
-    background_color: '#f8fafc',
-    theme_color: '#1e3a8a',
+    orientation: 'any',
+    background_color: '#ffffff',
+    theme_color: '#ffffff',
     icons: [
       {
         src: '/icon.jpg',

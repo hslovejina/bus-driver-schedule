@@ -1,7 +1,7 @@
 // 파일 위치: components/RosterView.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -69,6 +69,8 @@ export default function RosterView() {
   const [toast, setToast] = useState<ToastData | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+
   const showToast = useCallback(
     (message: string, type: 'SUCCESS' | 'WARNING' = 'SUCCESS', subMessage?: string) => {
       setToast({ message, type, subMessage });
@@ -132,17 +134,11 @@ export default function RosterView() {
     clearAllData,
   } = useRosterData(year, month, daysArray);
 
-  const {
-    containerRef,
-    scale,
-    resetScale,
-    showLandscapePrompt,
-    forceEnterLandscape,
-    dismissLandscapePrompt,
-  } = useMobileViewport();
+  // containerRef를 최상위 래퍼에 연결하여 제목행과 배차표 어디서든 두 손가락 확대/축소 작동
+  const { containerRef, scale, resetScale } = useMobileViewport();
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = tableScrollRef.current;
     if (!el) return;
     const updateWidth = () => {
       setContainerWidth(el.clientWidth);
@@ -155,7 +151,7 @@ export default function RosterView() {
       observer.disconnect();
       window.removeEventListener('resize', updateWidth);
     };
-  }, [containerRef]);
+  }, []);
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -187,7 +183,7 @@ export default function RosterView() {
     const { bIdx, dIdx, day } = scheduleModalObj;
 
     const timer = setTimeout(() => {
-      const container = containerRef.current;
+      const container = tableScrollRef.current;
       const cellEl = document.getElementById(`roster-cell-${bIdx}-${dIdx}-${day}`);
       if (!container || !cellEl) return;
 
@@ -233,7 +229,7 @@ export default function RosterView() {
     }, 10);
 
     return () => clearTimeout(timer);
-  }, [scheduleModalObj, containerRef, isPrivate]);
+  }, [scheduleModalObj, isPrivate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -953,8 +949,6 @@ export default function RosterView() {
 
   const headerRowSpan = showLongShifts && sortedLongShifts.length > 0 && !isPrivate ? 2 : 1;
 
-  // ✨ 민영제 우측 통계 열: 합계(36, 숫자3자리) + 절근로(36, 숫자3자리) + 복격근로(36, 숫자3자리) + 예상급여(80, 콤마포함 9자리) = 188px
-  // 줄어든 132px의 공간은 dayColWidth 계산을 통해 1~말일 날짜 배차 칸에 자동으로 균등 분배됨
   const isDesktop = containerWidth >= 1024;
   const leftCols = isPrivate ? [44, 68, 92] : [22, 36, 52];
   const leftStickyWidth = leftCols.reduce((a, b) => a + b, 0);
@@ -1037,7 +1031,10 @@ export default function RosterView() {
     : 'z-50 bg-slate-200 text-slate-800 border-r-[2px] border-r-slate-400 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600';
 
   return (
-    <div className="flex flex-col w-full h-full bg-slate-50 font-sans overscroll-none relative">
+    <div
+      ref={containerRef}
+      className="flex flex-col w-full h-full bg-slate-50 font-sans overscroll-none relative"
+    >
       {toast && (
         <div
           className={`fixed top-5 left-1/2 -translate-x-1/2 z-[500] max-w-lg w-[calc(100%-2rem)] sm:w-auto min-w-[320px] px-5 py-3.5 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.28)] border backdrop-blur-md flex items-start gap-3 animate-in fade-in slide-in-from-top-3 duration-200 ${
@@ -1086,8 +1083,10 @@ export default function RosterView() {
         />
       )}
 
+      {/* ✨ 상단 제목행: zoom: scale 동시 적용 + 제목 글자가 버튼에 밀려 사라지지 않도록 shrink-0 whitespace-nowrap 고정 */}
       <header
-        className={`flex flex-nowrap items-center justify-between gap-1 xl:gap-1.5 px-2 sm:px-3 py-1.5 xl:py-2 bg-white border-b border-gray-200 shadow-sm shrink-0 relative overflow-hidden ${
+        style={{ zoom: scale } as React.CSSProperties}
+        className={`flex flex-nowrap items-center justify-between gap-1.5 xl:gap-2 px-2 sm:px-3 py-1.5 xl:py-2 bg-white border-b border-gray-200 shadow-sm shrink-0 relative overflow-x-auto ${
           isModalActive ? 'z-[210] pointer-events-none' : 'z-50'
         }`}
       >
@@ -1170,15 +1169,16 @@ export default function RosterView() {
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-1 xl:gap-2 min-w-0 flex-1 px-1">
-          <Bus className="text-blue-600 hidden xl:block shrink-0" size={20} strokeWidth={2.5} />
-          <h1 className="font-black text-[13px] sm:text-[14.5px] xl:text-[18px] 2xl:text-[20px] leading-none text-gray-800 tracking-tight whitespace-nowrap truncate">
+        {/* 중앙 타이틀: shrink-0 whitespace-nowrap으로 고정하여 모바일에서도 글자가 절대 잘리거나 겹치지 않음 */}
+        <div className="flex items-center justify-center gap-1.5 xl:gap-2 shrink-0 px-2 whitespace-nowrap">
+          <Bus className="text-blue-600 shrink-0" size={18} strokeWidth={2.5} />
+          <h1 className="font-black text-[13.5px] sm:text-[15px] xl:text-[18px] 2xl:text-[20px] leading-none text-gray-800 tracking-tight whitespace-nowrap shrink-0">
             {route && route !== '미지정' && (
               <span className="mr-1">
                 <span className="text-indigo-700">{route}</span> 노선
               </span>
             )}
-            {year}년 {month}월 <span className="hidden lg:inline">근무 계획표</span>
+            {year}년 {month}월 근무 계획표
           </h1>
 
           {saveStatus === 'SAVING' && (
@@ -1294,41 +1294,19 @@ export default function RosterView() {
         </div>
       </header>
 
-      {showLandscapePrompt && (
-        <div className="bg-indigo-900 text-white px-3 py-2 flex items-center justify-between gap-2 text-[12.5px] font-bold shrink-0 z-50">
-          <span>📱 배차표는 가로 화면에 최적화되어 있습니다.</span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={forceEnterLandscape}
-              className="px-2.5 py-1 bg-amber-400 text-slate-950 font-black rounded-lg text-[12px] active:scale-95"
-            >
-              가로모드 전환
-            </button>
-            <button
-              type="button"
-              onClick={dismissLandscapePrompt}
-              className="px-2 py-1 bg-slate-700 text-slate-200 rounded-lg text-[11.5px]"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 bg-slate-100 p-0 sm:p-1.5 flex flex-col min-h-0 relative">
         {scale !== 1 && (
           <button
             type="button"
             onClick={resetScale}
-            className="fixed bottom-[74px] right-4 z-[180] px-3 py-1.5 bg-slate-900/90 text-white font-black text-[12.5px] rounded-full shadow-lg border border-slate-700 active:scale-95"
+            className="fixed bottom-[48px] right-4 z-[180] px-3 py-1.5 bg-slate-900/90 text-white font-black text-[12px] rounded-full shadow-lg border border-slate-700 active:scale-95"
           >
             🔍 {Math.round(scale * 100)}% (터치 시 100%)
           </button>
         )}
 
         <div
-          ref={containerRef}
+          ref={tableScrollRef}
           className="flex-1 overflow-auto relative touch-pan-x touch-pan-y touch-pinch-zoom shadow-sm"
         >
           <table

@@ -1,29 +1,33 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// 파일 위치: app/layout.tsx
+import type { Metadata, Viewport } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "배차메이커",
-  description: "기사 배차 스케줄링 시스템",
+  title: '배차메이커 - 버스 승무원 월간 근무 계획표',
+  description: '공공관리제 및 민영제 버스 노선 월간 배차·근무 통계 관리 시스템',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '배차메이커',
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#ffffff',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="ko">
+      <body className="antialiased bg-white text-slate-900">{children}</body>
     </html>
   );
 }

@@ -101,9 +101,9 @@ export default function SettingsView() {
   const currentRouteInfo = routes.find(r => r.name === currentUser.route);
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-slate-50 text-slate-800 flex flex-col items-center justify-center px-4 py-2 lg:py-6">
-      {/* 스마트폰(gap-3)은 현행 컴팩트 유지, PC(lg:gap-6 xl:gap-7)는 제목행과 각 테마행 사이 간격을 넓혀 가시성 향상 */}
-      <div className="w-full max-w-2xl flex flex-col gap-3 lg:gap-6 xl:gap-7">
+    <div className="w-full h-full overflow-y-auto bg-slate-50 text-slate-800 flex flex-col items-center px-4 pt-3 pb-6 lg:py-6">
+      {/* my-auto 적용: PC처럼 화면이 높을 때는 중앙 정렬되고, 스마트폰 가로모드처럼 높이가 낮을 때는 상단 잘림 없이 맨 위부터 표시 */}
+      <div className="w-full max-w-2xl my-auto flex flex-col gap-3 lg:gap-6 xl:gap-7">
         {/* 상단 타이틀 */}
         <div className="flex items-center gap-2 lg:gap-2.5 px-1 lg:mb-1">
           <Settings size={22} className="text-blue-600 lg:w-[26px] lg:h-[26px]" strokeWidth={2.5} />
