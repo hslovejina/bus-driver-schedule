@@ -191,7 +191,6 @@ function RosterTableRowComponent(props: Props) {
     !isBlankDriver &&
     (driver.name.includes(trimmedQuery) || busGroup.busNo.includes(trimmedQuery));
 
-  // ✨ 민영제는 여유 있는 36~38px 높이, 공공관리제는 슬림한 27~28px 높이로 이원화
   const trClass = `${
     isDriverMatchedBySearch ? 'bg-indigo-50/70' : 'hover:bg-slate-100/50'
   } group ${isPrivate ? 'h-[36px] xl:h-[38px]' : 'h-[27px] xl:h-[28px]'}`;
@@ -826,33 +825,33 @@ function RosterTableRowComponent(props: Props) {
         );
       })}
 
-      {/* 우측 통계 열 (민영제는 큼직하고 선명하게, 공공관리제는 컴팩트하게 이원화) */}
+      {/* 우측 통계 열: 민영제는 현재 글자 크기(15px) 그대로 좌우 여백(px-0)을 최소화해 3자리(36px) / 9자리(80px) 폭에 맞춤 */}
       {isPrivate ? (
         <>
           <td
-            className={`text-center py-1 px-1 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-0 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-800 text-[15px] xl:text-[15.5px]">
+            <span className="font-black text-slate-800 text-[15px] xl:text-[15.5px] tracking-tighter whitespace-nowrap">
               {isCompletelyEmptySlot ? '' : rowStats.totalWorkDays}
             </span>
           </td>
 
           <td
-            className={`text-center py-1 px-1 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[15px] xl:text-[15.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-0 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[15px] xl:text-[15.5px] tracking-tighter whitespace-nowrap ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.jeolnalTotal}
           </td>
 
           <td
-            className={`text-center py-1 px-1 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[15px] xl:text-[15.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-0 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[15px] xl:text-[15.5px] tracking-tighter whitespace-nowrap ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.bokgyeokCount}
           </td>
 
           <td
-            className={`text-center py-1 px-1.5 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-0.5 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-900 text-[14.5px] xl:text-[15px] tracking-tight whitespace-nowrap">
+            <span className="font-black text-slate-900 text-[14.5px] xl:text-[15px] tracking-tighter whitespace-nowrap">
               {isCompletelyEmptySlot ? '' : rowStats.expectedSalary.toLocaleString()}
             </span>
           </td>
