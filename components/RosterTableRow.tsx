@@ -14,6 +14,11 @@ import {
 
 const DOW_OPTIONS = ['일', '월', '화', '수', '목', '금', '토'];
 
+// 노선 형태(민영: A조 전체 -> B조 전체 / 공공: 차량별 순차)에 따른 실제 화면 행 순서 계산 함수
+function getVisualRowIndex(isPrivateRoute: boolean, bIdx: number, dIdx: number): number {
+  return isPrivateRoute ? dIdx * 1000 + bIdx : bIdx * 100 + dIdx;
+}
+
 interface Props {
   bIdx: number;
   dIdx: number;
@@ -390,6 +395,11 @@ function RosterTableRowComponent(props: Props) {
     ? driver.defaultRestDays.join('')
     : '-';
 
+  const currentRowIdx = getVisualRowIndex(isPrivate, bIdx, dIdx);
+  const targetRowIdx = isModalActive
+    ? getVisualRowIndex(isPrivate, targetBIdx, targetDIdx)
+    : -1;
+
   return (
     <tr id={`roster-row-${bIdx}-${dIdx}`} className={trClass}>
       {isPrivate ? (
@@ -625,9 +635,8 @@ function RosterTableRowComponent(props: Props) {
 
         const isTargetDate = targetDay === day;
         const isActiveCell = isTargetDate && isTargetDriver;
-        const currentRowIdx = bIdx * 100 + dIdx;
-        const targetRowIdx = targetBIdx * 100 + targetDIdx;
 
+        // ✨ 민영제/공공관리제 각각의 실제 화면 행 순서(currentRowIdx, targetRowIdx)를 기준으로 안내선 연결
         const isGuideRow = isTargetDriver && day < targetDay;
         const isGuideCol = isTargetDate && currentRowIdx < targetRowIdx;
         const isGuideCell = isGuideRow || isGuideCol;
@@ -781,7 +790,7 @@ function RosterTableRowComponent(props: Props) {
               isActiveCell
                 ? 'z-[200] bg-white ring-[3px] ring-blue-500 shadow-[0_0_20px_5px_rgba(59,130,246,0.8)] scale-[1.15] rounded-lg overflow-visible'
                 : isGuideCell
-                ? `z-[195] ${tdBgClass} ${borderBottomClass}`
+                ? `z-[195] ${tdBgClass} ${borderBottomClass} overflow-visible`
                 : `z-10 ${!isModalActive ? 'hover:bg-blue-50' : ''} ${tdBgClass} ${borderBottomClass} ${cellDimClass}`
             }`}
           >
@@ -807,10 +816,10 @@ function RosterTableRowComponent(props: Props) {
               <>
                 <div className="absolute inset-0 bg-slate-800/70 z-10 pointer-events-none" />
                 {isGuideRow && (
-                  <div className="absolute top-1/2 left-0 w-full h-[3px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,1)] -translate-y-1/2 z-20 pointer-events-none" />
+                  <div className="absolute top-1/2 -left-[1px] w-[calc(100%+3px)] h-[3px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,1)] -translate-y-1/2 z-20 pointer-events-none" />
                 )}
                 {isGuideCol && (
-                  <div className="absolute left-1/2 top-0 h-full w-[3px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,1)] -translate-x-1/2 z-20 pointer-events-none" />
+                  <div className="absolute left-1/2 -top-[1px] h-[calc(100%+4px)] w-[3px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,1)] -translate-x-1/2 z-20 pointer-events-none" />
                 )}
               </>
             )}
@@ -961,7 +970,7 @@ function RosterTableRowComponent(props: Props) {
   );
 }
 
-// ✨ 모달 이동 시 관계없는 행(가이드라인이나 활성 셀에 해당하지 않는 아래쪽 행들)의 불필요한 리렌더링을 건너뛰는 비교 함수
+// React.memo 비교 함수에도 동일한 실제 화면 행 순서(getVisualRowIndex) 적용
 function areRowPropsEqual(prev: Props, next: Props): boolean {
   if (
     prev.bIdx !== next.bIdx ||
@@ -1005,15 +1014,14 @@ function areRowPropsEqual(prev: Props, next: Props): boolean {
 
   const pActive = !!pModal;
   const nActive = !!nModal;
-  // 모달이 새로 열리거나 닫힐 때는 전체 행 배경 투명도(opacity-20)가 바뀌므로 리렌더링
   if (pActive !== nActive) return false;
   if (!pModal || !nModal) return true;
 
-  const rowIdx = next.bIdx * 100 + next.dIdx;
-  const pTargetIdx = pModal.bIdx * 100 + pModal.dIdx;
-  const nTargetIdx = nModal.bIdx * 100 + nModal.dIdx;
+  const isPriv = next.routeType === 'PRIVATE';
+  const rowIdx = getVisualRowIndex(isPriv, next.bIdx, next.dIdx);
+  const pTargetIdx = getVisualRowIndex(isPriv, pModal.bIdx, pModal.dIdx);
+  const nTargetIdx = getVisualRowIndex(isPriv, nModal.bIdx, nModal.dIdx);
 
-  // 이전 또는 현재 타겟 행이거나 그 위쪽 행(세로 파란 안내선 표시 대상)인 경우에만 리렌더링
   const wasAffected = rowIdx <= pTargetIdx;
   const isAffected = rowIdx <= nTargetIdx;
 
