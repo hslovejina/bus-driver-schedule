@@ -23,10 +23,16 @@ export async function GET(request: Request) {
       holidayMap[`${year}-07-17`] = '제헌절';
     }
 
-    return NextResponse.json(holidayMap);
+    return NextResponse.json(holidayMap, {
+      headers: {
+        // 브라우저 캐시 1시간 유지, 백그라운드 갱신 24시간 허용
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     console.error('공휴일 조회 에러:', error);
-    const fallbackYear = new URL(request.url).searchParams.get('year') || new Date().getFullYear().toString();
+    const fallbackYear =
+      new URL(request.url).searchParams.get('year') || new Date().getFullYear().toString();
     const fallbackMap: Record<string, string> = { [`${fallbackYear}-05-01`]: '근로자의 날' };
     if (Number(fallbackYear) >= 2026) {
       fallbackMap[`${fallbackYear}-07-17`] = '제헌절';

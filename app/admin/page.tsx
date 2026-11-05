@@ -165,8 +165,12 @@ export default function AdminDashboard() {
     if (!confirm('공공데이터포털에서 최신 휴일 정보를 가져오시겠습니까? (1~2초 소요)')) return;
     const res = await fetch('/api/admin', { method: 'POST', body: JSON.stringify({ action: 'SYNC_HOLIDAYS' }) });
     const data = await res.json();
-    if (data.error) alert(data.error);
-    else alert(data.message);
+    if (data.error) {
+      alert(data.error);
+    } else {
+      sessionStorage.clear();
+      alert(data.message);
+    }
   };
 
   const filteredUsers = users.filter(u => u.name.includes(searchTerm) || u.empId.includes(searchTerm));

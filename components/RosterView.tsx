@@ -207,13 +207,29 @@ export default function RosterView() {
   }, []);
 
   useEffect(() => {
+    const cacheKey = `cached_holidays_${year}`;
+    const cachedData = sessionStorage.getItem(cacheKey);
+
+    if (cachedData) {
+      try {
+        setHolidays(JSON.parse(cachedData));
+        setIsLoading(false);
+        return;
+      } catch {
+        sessionStorage.removeItem(cacheKey);
+      }
+    }
+
     const fetchHolidays = async () => {
       setIsLoading(true);
       try {
         const res = await fetch(`/api/holidays?year=${year}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (data && !data.error) setHolidays(data);
+        if (data && !data.error) {
+          setHolidays(data);
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        }
       } catch (err) {
         console.error('공휴일 불러오기 실패', err);
       } finally {
