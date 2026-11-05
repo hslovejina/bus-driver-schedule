@@ -1,7 +1,7 @@
 // 파일 위치: components/modals/ScheduleInputModal.tsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   CalendarDays,
@@ -38,8 +38,6 @@ interface Props {
   onOpenSubstitutes?: () => void;
 }
 
-let lastModalPosition: { x: number; y: number } | null = null;
-
 export default function ScheduleInputModal({
   modalObj,
   onClose,
@@ -73,33 +71,138 @@ export default function ScheduleInputModal({
     initialY: number;
   } | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const hasUserDraggedRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    if (modalObj && modalRef.current) {
-      setViewMode('MAIN');
-      setCustomInput('');
-      setPendingSwap(null);
+  // 선택된 입력 칸(셀)을 가리지 않는 최적의 모달 좌표를 계산하는 함수
+  const updateSmartPosition = useCallback(() => {
+    if (!modalObj || !modalRef.current) return;
 
-      const rect = modalRef.current.getBoundingClientRect();
-      const maxX = Math.max(8, window.innerWidth - rect.width - 8);
-      const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+    const modalEl = modalRef.current;
+    const modalRect = modalEl.getBoundingClientRect();
+    const modalW = modalRect.width || 360;
+    const modalH = modalRect.height || 380;
 
-      if (lastModalPosition) {
-        setPosition({
-          x: Math.min(Math.max(8, lastModalPosition.x), maxX),
-          y: Math.min(Math.max(8, lastModalPosition.y), maxY),
-        });
-      } else {
-        const startX = Math.max(8, (window.innerWidth - rect.width) / 2);
-        const startY = Math.max(8, (window.innerHeight - rect.height) / 2);
-        setPosition({ x: startX, y: startY });
-      }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 12;
+    const topSafe = 52; // 상단 헤더 아래 안전선
+    const bottomSafe = vh - 46; // 하단 네비게이션 탭 위 안전선
+    const cellGap = 22; // 확대(scale-1.15)된 셀 테두리와의 여유 간격
+
+    // 사용자가 현재 셀에서 직접 드래그해 둔 경우 화면 밖으로 나가지 않게만 보정
+    if (hasUserDraggedRef.current) {
+      setPosition(prev => ({
+        x: Math.min(Math.max(margin, prev.x), Math.max(margin, vw - modalW - margin)),
+        y: Math.min(Math.max(topSafe, prev.y), Math.max(topSafe, bottomSafe - modalH)),
+      }));
+      return;
     }
+
+    const cellEl = document.getElementById(
+      `roster-cell-${modalObj.bIdx}-${modalObj.dIdx}-${modalObj.day}`
+    );
+
+    if (!cellEl) {
+      setPosition({
+        x: Math.max(margin, (vw - modalW) / 2),
+        y: Math.max(topSafe, (vh - modalH) / 2),
+      });
+      return;
+    }
+
+    const cellRect = cellEl.getBoundingClientRect();
+    const stickyLeftEdge = 114; // 좌측 고정열(순서·차번·성명) 우측 끝선
+
+    const spaceRight = vw - margin - (cellRect.right + cellGap);
+    const spaceLeftFromSticky = cellRect.left - cellGap - stickyLeftEdge;
+    const spaceLeftTotal = cellRect.left - cellGap - margin;
+    const spaceBelow = bottomSafe - (cellRect.bottom + cellGap);
+    const spaceAbove = cellRect.top - cellGap - topSafe;
+
+    let targetX = margin;
+    let targetY = topSafe;
+
+    if (spaceRight >= modalW) {
+      // 1순위: 셀 오른쪽에 충분한 공간이 있으면 셀 우측에 배치 (셀 및 좌/상단 파란 안내선 모두 비가림)
+      targetX = Math.min(cellRect.right + cellGap + 8, vw - modalW - margin);
+      const idealY = cellRect.top - 16;
+      targetY = Math.min(Math.max(topSafe, idealY), Math.max(topSafe, bottomSafe - modalH));
+    } else if (spaceLeftFromSticky >= modalW || spaceLeftTotal >= modalW) {
+      // 2순위: 우측 날짜(월 후반부) 클릭 시 셀 왼쪽에 배치
+      const minLeftX = spaceLeftFromSticky >= modalW ? stickyLeftEdge : margin;
+      targetX = Math.max(minLeftX, cellRect.left - modalW - cellGap - 8);
+
+      // 가로 파란 안내선(해당 행)까지 가리지 않도록 아래나 위에 공간이 있으면 우선 배치
+      if (spaceBelow >= modalH) {
+        targetY = cellRect.bottom + cellGap;
+      } else if (spaceAbove >= modalH) {
+        targetY = cellRect.top - modalH - cellGap;
+      } else {
+        const idealY = cellRect.top - modalH / 3;
+        targetY = Math.min(Math.max(topSafe, idealY), Math.max(topSafe, bottomSafe - modalH));
+      }
+    } else if (spaceBelow >= modalH) {
+      // 3순위: 좁은 화면에서는 셀 아래쪽에 배치
+      targetY = cellRect.bottom + cellGap;
+      targetX = Math.min(Math.max(margin, cellRect.left - modalW / 3), Math.max(margin, vw - modalW - margin));
+    } else if (spaceAbove >= modalH) {
+      // 4순위: 셀 위쪽에 배치
+      targetY = cellRect.top - modalH - cellGap;
+      targetX = Math.min(Math.max(margin, cellRect.left - modalW / 3), Math.max(margin, vw - modalW - margin));
+    } else {
+      // 5순위: 초소형 화면 폴백 — 셀과 반대쪽 코너에 배치하여 입력 칸 겹침 방지
+      targetX = cellRect.left > vw / 2 ? margin : Math.max(margin, vw - modalW - margin);
+      targetY = cellRect.top > vh / 2 ? topSafe : Math.max(topSafe, bottomSafe - modalH);
+    }
+
+    setPosition({
+      x: Math.round(targetX),
+      y: Math.round(targetY),
+    });
   }, [modalObj]);
+
+  // 새 셀이 선택될 때마다 드래그 여부 초기화 및 스마트 위치 적용
+  useEffect(() => {
+    if (!modalObj) return;
+    setViewMode('MAIN');
+    setCustomInput('');
+    setPendingSwap(null);
+    hasUserDraggedRef.current = false;
+
+    const rafId = requestAnimationFrame(() => {
+      updateSmartPosition();
+    });
+    const timerId = setTimeout(() => {
+      updateSmartPosition();
+    }, 60);
+
+    const handleScrolled = () => updateSmartPosition();
+    window.addEventListener('roster-cell-scrolled', handleScrolled);
+    window.addEventListener('resize', handleScrolled);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+      window.removeEventListener('roster-cell-scrolled', handleScrolled);
+      window.removeEventListener('resize', handleScrolled);
+    };
+  }, [modalObj, updateSmartPosition]);
+
+  // 오전/오후 서브메뉴 진입 또는 맞교대 배너 표시로 모달 크기가 변할 때도 셀을 가리지 않도록 자동 보정
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el || !modalObj) return;
+    const observer = new ResizeObserver(() => {
+      updateSmartPosition();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [modalObj, viewMode, pendingSwap, updateSmartPosition]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
     setIsDragging(true);
+    hasUserDraggedRef.current = true;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = {
       startX: e.clientX,
@@ -133,7 +236,6 @@ export default function ScheduleInputModal({
   const handlePointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    lastModalPosition = { x: position.x, y: position.y };
   };
 
   const handleCustomSubmit = () => {
@@ -313,7 +415,7 @@ export default function ScheduleInputModal({
         </div>
       )}
 
-      {/* 본문 영역 (화면 높이가 낮을 때 내부 스크롤 지원) */}
+      {/* 본문 영역 */}
       <div
         className="p-4 xl:p-6 flex flex-col bg-white pointer-events-auto cursor-default flex-1 min-h-0 overflow-y-auto"
         style={{ touchAction: 'pan-y' }}

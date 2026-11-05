@@ -181,7 +181,7 @@ export default function RosterView() {
 
   const isModalActive = !!scheduleModalObj;
 
-  // ✨ 순번점검 모달 등에서 기사 클릭 시 해당 기사의 행·열 칸이 화면 밖에 있으면 자동으로 중앙에 보이도록 스크롤 이동
+  // ✨ 셀 선택(직접 클릭 또는 순번 점검 모달 이동) 시 가시 영역 확보 후 모달 자동 배치 이벤트 호출
   useEffect(() => {
     if (!scheduleModalObj) return;
     const { bIdx, dIdx, day } = scheduleModalObj;
@@ -194,7 +194,6 @@ export default function RosterView() {
       const containerRect = container.getBoundingClientRect();
       const cellRect = cellEl.getBoundingClientRect();
 
-      // 상단 고정 헤더(thead), 하단 고정 합계행(tfoot), 좌측 고정열(성명까지)의 크기를 감안한 실제 가시 영역
       const stickyTopHeight = 52;
       const stickyBottomHeight = 72;
       const stickyLeftWidth = 115;
@@ -223,13 +222,16 @@ export default function RosterView() {
       }
 
       if (shouldScroll) {
+        // 즉시 스크롤하여 ScheduleInputModal이 정확한 셀 위치를 계산할 수 있도록 함
         container.scrollTo({
           top: Math.max(0, nextScrollTop),
           left: Math.max(0, nextScrollLeft),
-          behavior: 'smooth',
+          behavior: 'auto',
         });
       }
-    }, 30);
+
+      window.dispatchEvent(new Event('roster-cell-scrolled'));
+    }, 10);
 
     return () => clearTimeout(timer);
   }, [scheduleModalObj, containerRef]);
