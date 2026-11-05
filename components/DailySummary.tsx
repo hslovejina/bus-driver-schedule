@@ -90,7 +90,7 @@ export default function DailySummary({
     <>
       {!isPrivate && (
         <>
-          {/* 1. 오전 합계 행 (상하 여백 최소화 h-[22px]) */}
+          {/* 1. 오전 합계 행 (공공관리제 전용 컴팩트 h-[22px]) */}
           <tr className="bg-white h-[22px]">
             <td className={`sticky left-0 z-50 bg-white border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${amTopBotBorder}`}></td>
             <td className={`sticky left-[22px] z-50 bg-white border-r border-r-slate-300 ${amTopBotBorder}`}></td>
@@ -137,7 +137,7 @@ export default function DailySummary({
             {renderTrailingStatCells('bg-white', amTopBotBorder)}
           </tr>
 
-          {/* 2. 오후 합계 행 (상하 여백 최소화 h-[22px]) */}
+          {/* 2. 오후 합계 행 (공공관리제 전용 컴팩트 h-[22px]) */}
           <tr className="bg-white h-[22px]">
             <td className={`sticky left-0 z-50 bg-white border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${pmTopBotBorder}`}></td>
             <td className={`sticky left-[22px] z-50 bg-white border-r border-r-slate-300 ${pmTopBotBorder}`}></td>
@@ -186,11 +186,23 @@ export default function DailySummary({
         </>
       )}
 
-      {/* 3. 전체 합계 행 (상하 여백 최소화 h-[22px]) */}
-      <tr className="bg-slate-100 h-[22px]">
-        <td className={`sticky left-0 z-50 bg-slate-200 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${totalTopBotBorder}`}></td>
-        <td className={`sticky left-[22px] z-50 bg-slate-200 border-r border-r-slate-300 ${totalTopBotBorder}`}></td>
-        <td className={`sticky left-[58px] z-50 bg-slate-100 border-r-[2px] border-r-slate-400 text-center py-0.5 px-0 font-black text-slate-800 text-[12.5px] leading-none ${totalTopBotBorder}`}>
+      {/* 3. 전체 합계 행 (민영제는 h-[36px] xl:h-[38px]로 큼직하게, 공공관리제는 h-[22px]로 슬림하게 이원화) */}
+      <tr className={`bg-slate-100 ${isPrivate ? 'h-[36px] xl:h-[38px]' : 'h-[22px]'}`}>
+        <td
+          className={`sticky left-0 z-50 bg-slate-200 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${totalTopBotBorder}`}
+        ></td>
+        <td
+          className={`sticky ${
+            isPrivate ? 'left-[44px]' : 'left-[22px]'
+          } z-50 bg-slate-200 border-r border-r-slate-300 ${totalTopBotBorder}`}
+        ></td>
+        <td
+          className={`sticky ${
+            isPrivate
+              ? 'left-[112px] py-2 text-[15px]'
+              : 'left-[58px] py-0.5 text-[12.5px] leading-none'
+          } z-50 bg-slate-100 border-r-[2px] border-r-slate-400 text-center px-0 font-black text-slate-800 ${totalTopBotBorder}`}
+        >
           합계
         </td>
         {!isPrivate && showLongShifts && (
@@ -210,19 +222,27 @@ export default function DailySummary({
               key={day}
               onClick={() => onCellClick?.(day, 'TOTAL')}
               title={`${day}일 전체 순번 누락·중복 확인 (클릭)`}
-              className={`relative z-40 text-center py-0.5 px-0 ${rightBorder} align-middle cursor-pointer hover:bg-slate-200 transition-colors ${
+              className={`relative z-40 text-center ${
+                isPrivate ? 'py-1.5' : 'py-0.5'
+              } px-0 ${rightBorder} align-middle cursor-pointer hover:bg-slate-200 transition-colors ${
                 isToday ? 'bg-blue-100' : 'bg-slate-100'
               } ${totalTopBotBorder}`}
             >
               {isIncomplete ? (
-                <span className="inline-flex items-center justify-center min-w-[20px] h-[17px] px-0.5 bg-red-50 text-red-600 ring-[1.5px] ring-red-500 rounded font-black text-[12px] xl:text-[12.5px] leading-none">
+                <span
+                  className={`inline-flex items-center justify-center ${
+                    isPrivate
+                      ? 'min-w-[26px] h-[23px] px-1 ring-[2px] text-[14.5px]'
+                      : 'min-w-[20px] h-[17px] px-0.5 ring-[1.5px] text-[12px] xl:text-[12.5px]'
+                  } bg-red-50 text-red-600 ring-red-500 rounded font-black leading-none`}
+                >
                   {val}
                 </span>
               ) : (
                 <span
-                  className={`font-black text-[12.5px] xl:text-[13px] leading-none ${
-                    val > 0 ? 'text-slate-800' : 'text-slate-300'
-                  }`}
+                  className={`font-black ${
+                    isPrivate ? 'text-[15px]' : 'text-[12.5px] xl:text-[13px]'
+                  } leading-none ${val > 0 ? 'text-slate-800' : 'text-slate-300'}`}
                 >
                   {val}
                 </span>

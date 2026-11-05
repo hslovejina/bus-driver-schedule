@@ -191,10 +191,10 @@ function RosterTableRowComponent(props: Props) {
     !isBlankDriver &&
     (driver.name.includes(trimmedQuery) || busGroup.busNo.includes(trimmedQuery));
 
-  // ✨ 행 높이를 27px(xl:28px)로 슬림화하여 한 화면에 더 많은 기사가 표시되도록 개선
+  // ✨ 민영제는 여유 있는 36~38px 높이, 공공관리제는 슬림한 27~28px 높이로 이원화
   const trClass = `${
     isDriverMatchedBySearch ? 'bg-indigo-50/70' : 'hover:bg-slate-100/50'
-  } group h-[27px] xl:h-[28px]`;
+  } group ${isPrivate ? 'h-[36px] xl:h-[38px]' : 'h-[27px] xl:h-[28px]'}`;
 
   const rowStats = useMemo(() => {
     if (passedRowStats) return passedRowStats;
@@ -260,8 +260,13 @@ function RosterTableRowComponent(props: Props) {
     ? 'bg-indigo-100 text-indigo-900 ring-2 ring-indigo-500 ring-inset'
     : 'bg-white group-hover:bg-slate-50';
 
-  const alignClass =
-    effectiveAlign === 'left' ? 'text-left pl-0.5 pr-0' : 'text-right pr-0.5 pl-0';
+  const alignClass = isPrivate
+    ? effectiveAlign === 'left'
+      ? 'text-left pl-2 pr-1'
+      : 'text-right pr-2 pl-1'
+    : effectiveAlign === 'left'
+    ? 'text-left pl-0.5 pr-0'
+    : 'text-right pr-0.5 pl-0';
 
   const handleBusCellClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -390,7 +395,7 @@ function RosterTableRowComponent(props: Props) {
     <tr id={`roster-row-${bIdx}-${dIdx}`} className={trClass}>
       {isPrivate ? (
         <td
-          className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[12px] align-middle py-0 px-0 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
+          className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[14px] xl:text-[14.5px] align-middle py-1 px-1 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
         >
           {dIdx === 0 ? 'A' : 'B'}
         </td>
@@ -408,11 +413,11 @@ function RosterTableRowComponent(props: Props) {
       {isPrivate ? (
         <td
           onClick={handleBusCellClick}
-          className={`sticky left-[22px] ${
+          className={`sticky left-[44px] ${
             isMenuActive
               ? 'z-[60] bg-blue-100 ring-2 ring-blue-500 ring-inset'
               : 'z-30 bg-slate-50 hover:bg-slate-200'
-          } cursor-pointer ${alignClass} font-black text-slate-700 text-[12px] align-middle py-0 tracking-tighter border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
+          } cursor-pointer ${alignClass} font-black text-slate-700 text-[14px] xl:text-[14.5px] align-middle py-1 tracking-tight border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
         >
           {busGroup.busNo}
           {busMenuPopover}
@@ -436,7 +441,11 @@ function RosterTableRowComponent(props: Props) {
 
       <td
         id={`roster-driver-${bIdx}-${dIdx}`}
-        className={`sticky left-[58px] ${alignClass} py-0 font-extrabold text-slate-900 text-[12px] xl:text-[12.5px] leading-none align-middle tracking-tighter whitespace-nowrap cursor-pointer border-r-[2px] border-r-slate-400 ${
+        className={`sticky ${
+          isPrivate
+            ? 'left-[112px] py-1 text-[14.5px] xl:text-[15px] tracking-tight'
+            : 'left-[58px] py-0 text-[12px] xl:text-[12.5px] leading-none tracking-tighter'
+        } ${alignClass} font-extrabold text-slate-900 align-middle whitespace-nowrap cursor-pointer border-r-[2px] border-r-slate-400 ${
           isDriverEditing
             ? 'z-[60] bg-blue-100 ring-2 ring-blue-500 ring-inset overflow-visible'
             : 'z-30'
@@ -625,7 +634,9 @@ function RosterTableRowComponent(props: Props) {
         const isGuideCell = isGuideRow || isGuideCol;
 
         let textColor = 'text-slate-900';
-        let fontWeightClass = 'font-black text-[15px] xl:text-[16.5px] leading-none';
+        let fontWeightClass = isPrivate
+          ? 'font-black text-[17px] xl:text-[18px] leading-none'
+          : 'font-black text-[15px] xl:text-[16.5px] leading-none';
         let hasPrivateWarning = false;
 
         const isRegularPrivateShift =
@@ -642,12 +653,12 @@ function RosterTableRowComponent(props: Props) {
           const isDefault = baseWork !== undefined && baseWork === work;
 
           fontWeightClass = isDefault
-            ? 'font-normal text-[15px] xl:text-[16.5px] leading-none'
-            : 'font-black text-[15px] xl:text-[16.5px] leading-none';
+            ? 'font-normal text-[17px] xl:text-[18px] leading-none'
+            : 'font-black text-[17px] xl:text-[18px] leading-none';
 
           if (isDuplicate || isSatDrop || isSunDrop) {
             textColor = 'text-red-600';
-            fontWeightClass = 'font-black text-[15px] xl:text-[16.5px] leading-none';
+            fontWeightClass = 'font-black text-[17px] xl:text-[18px] leading-none';
             hasPrivateWarning = true;
           }
         }
@@ -703,7 +714,9 @@ function RosterTableRowComponent(props: Props) {
         } else if (work === '신청휴무') {
           content = (
             <span
-              className={`font-black text-[16.5px] xl:text-[18px] flex items-center justify-center leading-none ${
+              className={`font-black ${
+                isPrivate ? 'text-[20px] xl:text-[22px]' : 'text-[16.5px] xl:text-[18px]'
+              } flex items-center justify-center leading-none ${
                 isActiveCell ? 'text-blue-600' : 'text-slate-500'
               }`}
             >
@@ -713,15 +726,17 @@ function RosterTableRowComponent(props: Props) {
         } else if (isRegularPrivateShift) {
           content = <span className={`${fontWeightClass} ${textColor} whitespace-nowrap`}>{work}</span>;
         } else {
-          let fontSizeClass = 'text-[12px] xl:text-[13px] tracking-tighter';
+          let fontSizeClass = isPrivate
+            ? 'text-[13px] xl:text-[14px] tracking-tight'
+            : 'text-[12px] xl:text-[13px] tracking-tighter';
           if (work.length === 3) {
             fontSizeClass = 'text-[11px] xl:text-[12px] tracking-[-0.07em]';
           } else if (work.length >= 4) {
             fontSizeClass = 'text-[10px] xl:text-[11px] tracking-[-0.08em]';
           }
 
-          // ✨ 슬림해진 행 높이(27~28px)에 맞춰 배지 높이를 23px(xl:24px)로 조정
-          let pillClass = `m-auto w-[calc(100%-2px)] max-w-[42px] h-[23px] xl:h-[24px] font-black rounded-[4px] ${fontSizeClass} leading-none whitespace-nowrap shadow-2xs border flex items-center justify-center px-0 overflow-hidden relative `;
+          const pillHeightClass = isPrivate ? 'h-[28px] xl:h-[30px]' : 'h-[23px] xl:h-[24px]';
+          let pillClass = `m-auto w-[calc(100%-2px)] max-w-[42px] ${pillHeightClass} font-black rounded-[4px] ${fontSizeClass} leading-none whitespace-nowrap shadow-2xs border flex items-center justify-center px-0 overflow-hidden relative `;
           if (work.includes('전')) {
             pillClass += 'bg-orange-500 border-orange-600 text-white';
           } else if (work.includes('후')) {
@@ -773,13 +788,13 @@ function RosterTableRowComponent(props: Props) {
           >
             {isBokgyeokCell && !isActiveCell && !isGuideCell && (
               <div
-                className={`absolute inset-y-[1.5px] pointer-events-none border-red-500 z-20 border-y-[1.5px] ${
+                className={`absolute inset-y-[2px] pointer-events-none border-red-500 z-20 border-y-[1.5px] ${
                   !isPrevWorked
-                    ? 'left-[1px] border-l-[1.5px] rounded-l-[4px]'
+                    ? 'left-[2px] border-l-[1.5px] rounded-l-[6px]'
                     : 'left-0 border-l-0'
                 } ${
                   !isNextWorked
-                    ? 'right-[1px] border-r-[1.5px] rounded-r-[4px]'
+                    ? 'right-[2px] border-r-[1.5px] rounded-r-[6px]'
                     : 'right-0 border-r-0'
                 }`}
               />
@@ -811,33 +826,33 @@ function RosterTableRowComponent(props: Props) {
         );
       })}
 
-      {/* 우측 통계 열 */}
+      {/* 우측 통계 열 (민영제는 큼직하고 선명하게, 공공관리제는 컴팩트하게 이원화) */}
       {isPrivate ? (
         <>
           <td
-            className={`text-center py-0 px-0 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-1 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-800 text-[12.5px] tracking-tighter">
+            <span className="font-black text-slate-800 text-[15px] xl:text-[15.5px]">
               {isCompletelyEmptySlot ? '' : rowStats.totalWorkDays}
             </span>
           </td>
 
           <td
-            className={`text-center py-0 px-0 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[12.5px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-1 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[15px] xl:text-[15.5px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.jeolnalTotal}
           </td>
 
           <td
-            className={`text-center py-0 px-0 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[12.5px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-1 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[15px] xl:text-[15.5px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.bokgyeokCount}
           </td>
 
           <td
-            className={`text-center py-0 px-0 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-1 px-1.5 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-900 text-[11.5px] xl:text-[12px] tracking-tighter whitespace-nowrap">
+            <span className="font-black text-slate-900 text-[14.5px] xl:text-[15px] tracking-tight whitespace-nowrap">
               {isCompletelyEmptySlot ? '' : rowStats.expectedSalary.toLocaleString()}
             </span>
           </td>

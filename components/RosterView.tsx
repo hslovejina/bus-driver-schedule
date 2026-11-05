@@ -180,8 +180,9 @@ export default function RosterView() {
   } | null>(null);
 
   const isModalActive = !!scheduleModalObj;
+  const isPrivate = routeInfo?.routeType === 'PRIVATE';
 
-  // ✨ 셀 선택(직접 클릭 또는 순번 점검 모달 이동) 시 가시 영역 확보 후 모달 자동 배치 이벤트 호출
+  // 셀 선택(직접 클릭 또는 순번 점검 모달 이동) 시 가시 영역 확보 후 모달 자동 배치 이벤트 호출
   useEffect(() => {
     if (!scheduleModalObj) return;
     const { bIdx, dIdx, day } = scheduleModalObj;
@@ -194,9 +195,9 @@ export default function RosterView() {
       const containerRect = container.getBoundingClientRect();
       const cellRect = cellEl.getBoundingClientRect();
 
-      const stickyTopHeight = 52;
-      const stickyBottomHeight = 72;
-      const stickyLeftWidth = 115;
+      const stickyTopHeight = isPrivate ? 58 : 52;
+      const stickyBottomHeight = isPrivate ? 44 : 72;
+      const stickyLeftWidth = isPrivate ? 208 : 115;
 
       const visibleTop = containerRect.top + stickyTopHeight;
       const visibleBottom = containerRect.bottom - stickyBottomHeight;
@@ -222,7 +223,6 @@ export default function RosterView() {
       }
 
       if (shouldScroll) {
-        // 즉시 스크롤하여 ScheduleInputModal이 정확한 셀 위치를 계산할 수 있도록 함
         container.scrollTo({
           top: Math.max(0, nextScrollTop),
           left: Math.max(0, nextScrollLeft),
@@ -234,7 +234,7 @@ export default function RosterView() {
     }, 10);
 
     return () => clearTimeout(timer);
-  }, [scheduleModalObj, containerRef]);
+  }, [scheduleModalObj, containerRef, isPrivate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -422,7 +422,6 @@ export default function RosterView() {
   }, []);
 
   const maxShiftCount = routeInfo?.weekdayCount || maxDriverOrder || 50;
-  const isPrivate = routeInfo?.routeType === 'PRIVATE';
 
   const hasAnyScheduleData = useMemo(() => {
     return rosterData.some(group =>
@@ -955,11 +954,14 @@ export default function RosterView() {
 
   const headerRowSpan = showLongShifts && sortedLongShifts.length > 0 && !isPrivate ? 2 : 1;
 
+  // ✨ 공공관리제(현행 압축 유지) vs 민영제(좌우 통계 열 확대 및 배차칸 적정 크기 조절) 서식 이원화
   const isDesktop = containerWidth >= 1024;
-  const leftStickyWidth = 22 + 36 + 52;
+  const leftCols = isPrivate ? [44, 68, 92] : [22, 36, 52]; // 민영 204px vs 공공 110px
+  const leftStickyWidth = leftCols.reduce((a, b) => a + b, 0);
+
   const rightStatsCols = isPrivate
-    ? [26, 26, 26, 68]
-    : [26, 22, 22, 26, 28, 25, 26, 26, 68];
+    ? [64, 64, 64, 128] // 민영: 합계(64) + 절근로(64) + 복격근로(64) + 예상급여(128) = 320px
+    : [26, 22, 22, 26, 28, 25, 26, 26, 68]; // 공공: 269px
   const rightStatsWidth = rightStatsCols.reduce((a, b) => a + b, 0);
 
   const dayColWidth = useMemo(() => {
@@ -1343,9 +1345,9 @@ export default function RosterView() {
             }`}
           >
             <colgroup>
-              <col style={{ width: '22px' }} />
-              <col style={{ width: '36px' }} />
-              <col style={{ width: '52px' }} />
+              <col style={{ width: `${leftCols[0]}px` }} />
+              <col style={{ width: `${leftCols[1]}px` }} />
+              <col style={{ width: `${leftCols[2]}px` }} />
               {!isPrivate && showLongShifts && <col style={{ width: '28px' }} />}
               {daysArray.map(d => (
                 <col key={`col-day-${d}`} style={{ width: `${dayColWidth}px` }} />
@@ -1373,7 +1375,11 @@ export default function RosterView() {
               <tr className="border-0">
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-0 w-[22px] py-0.5 font-black text-[10.5px] align-middle px-0 leading-[1.1] ${cornerActive1}`}
+                  className={`sticky left-0 ${
+                    isPrivate
+                      ? 'w-[44px] py-2 text-[14px]'
+                      : 'w-[22px] py-0.5 text-[10.5px] leading-[1.1]'
+                  } font-black align-middle px-0 ${cornerActive1}`}
                 >
                   {isPrivate ? (
                     '조'
@@ -1385,13 +1391,21 @@ export default function RosterView() {
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[22px] w-[36px] py-0.5 font-black text-[12px] align-middle tracking-tighter px-0 ${cornerActive2}`}
+                  className={`sticky ${
+                    isPrivate
+                      ? 'left-[44px] w-[68px] py-2 text-[14px]'
+                      : 'left-[22px] w-[36px] py-0.5 text-[12px] tracking-tighter'
+                  } font-black align-middle px-0 ${cornerActive2}`}
                 >
                   차번
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[58px] w-[52px] py-0.5 font-black text-[12.5px] align-middle tracking-tighter px-0 ${cornerActive3}`}
+                  className={`sticky ${
+                    isPrivate
+                      ? 'left-[112px] w-[92px] py-2 text-[14.5px]'
+                      : 'left-[58px] w-[52px] py-0.5 text-[12.5px] tracking-tighter'
+                  } font-black align-middle px-0 ${cornerActive3}`}
                 >
                   성명
                 </th>
@@ -1443,13 +1457,27 @@ export default function RosterView() {
                     <th
                       key={day}
                       rowSpan={headerRowSpan}
-                      className={`py-0.5 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
+                      className={`${
+                        isPrivate ? 'py-1.5' : 'py-0.5'
+                      } text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
                     >
                       <div className="flex flex-col items-center justify-start h-full gap-0.5 pt-0.5 px-0 w-full">
-                        <span className={`text-[13px] xl:text-[14px] font-black leading-none ${dateColor}`}>
+                        <span
+                          className={`${
+                            isPrivate
+                              ? 'text-[14px] xl:text-[15px]'
+                              : 'text-[13px] xl:text-[14px]'
+                          } font-black leading-none ${dateColor}`}
+                        >
                           {day}
                         </span>
-                        <span className={`text-[9.5px] xl:text-[10.5px] font-bold leading-none ${dowColor}`}>
+                        <span
+                          className={`${
+                            isPrivate
+                              ? 'text-[10.5px] xl:text-[11px]'
+                              : 'text-[9.5px] xl:text-[10.5px]'
+                          } font-bold leading-none ${dowColor}`}
+                        >
                           {getDayOfWeekText(day)}
                         </span>
                         {dayType === 'JEOLNAL' && holidays[dateStr] ? (
@@ -1473,25 +1501,25 @@ export default function RosterView() {
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-0.5 px-0 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-2 px-1 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[13.5px] xl:text-[14px] align-middle leading-tight ${generalDimClass}`}
                     >
-                      합<br />계
+                      합계
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-0.5 px-0 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-2 px-1 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[13.5px] xl:text-[14px] align-middle leading-tight ${generalDimClass}`}
                     >
-                      절<br />근로
+                      절근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-purple-400 bg-purple-100 text-purple-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-2 px-1 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-purple-400 bg-purple-100 text-purple-800 font-extrabold text-[13.5px] xl:text-[14px] align-middle leading-tight ${generalDimClass}`}
                     >
-                      복격<br />근로
+                      복격근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[12px] align-middle tracking-tighter ${generalDimClass}`}
+                      className={`py-2 px-1 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[14.5px] xl:text-[15px] align-middle ${generalDimClass}`}
                     >
                       예상급여
                     </th>
