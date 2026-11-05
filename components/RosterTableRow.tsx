@@ -193,7 +193,7 @@ function RosterTableRowComponent(props: Props) {
 
   const trClass = `${
     isDriverMatchedBySearch ? 'bg-indigo-50/70' : 'hover:bg-slate-100/50'
-  } group h-[34px]`;
+  } group h-[33px]`;
 
   const rowStats = useMemo(() => {
     if (passedRowStats) return passedRowStats;
@@ -260,7 +260,7 @@ function RosterTableRowComponent(props: Props) {
     : 'bg-white group-hover:bg-slate-50';
 
   const alignClass =
-    effectiveAlign === 'left' ? 'text-left pl-1 pr-0.5' : 'text-right pr-1 pl-0.5';
+    effectiveAlign === 'left' ? 'text-left pl-0.5 pr-0' : 'text-right pr-0.5 pl-0';
 
   const handleBusCellClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -389,7 +389,7 @@ function RosterTableRowComponent(props: Props) {
     <tr className={trClass}>
       {isPrivate ? (
         <td
-          className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[13.5px] align-middle px-0.5 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
+          className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[12.5px] align-middle px-0 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
         >
           {dIdx === 0 ? 'A' : 'B'}
         </td>
@@ -397,7 +397,7 @@ function RosterTableRowComponent(props: Props) {
         dIdx === 0 && (
           <td
             rowSpan={busGroup.drivers.length}
-            className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[13.5px] align-middle px-0.5 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${mergedCellBorderClass} ${generalDimClass}`}
+            className={`sticky left-0 z-30 bg-slate-100 text-center font-black text-slate-700 text-[12.5px] align-middle px-0 border-l-[2.5px] border-l-slate-700 border-r border-r-slate-300 ${mergedCellBorderClass} ${generalDimClass}`}
           >
             {busGroup.displayNo}
           </td>
@@ -407,11 +407,11 @@ function RosterTableRowComponent(props: Props) {
       {isPrivate ? (
         <td
           onClick={handleBusCellClick}
-          className={`sticky left-[30px] ${
+          className={`sticky left-[22px] ${
             isMenuActive
               ? 'z-[60] bg-blue-100 ring-2 ring-blue-500 ring-inset'
               : 'z-30 bg-slate-50 hover:bg-slate-200'
-          } cursor-pointer ${alignClass} font-black text-slate-700 text-[13.5px] align-middle tracking-tighter border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
+          } cursor-pointer ${alignClass} font-black text-slate-700 text-[12.5px] align-middle tracking-tighter border-r border-r-slate-300 ${borderBottomClass} ${generalDimClass}`}
         >
           {busGroup.busNo}
           {busMenuPopover}
@@ -421,11 +421,11 @@ function RosterTableRowComponent(props: Props) {
           <td
             rowSpan={busGroup.drivers.length}
             onClick={handleBusCellClick}
-            className={`sticky left-[30px] ${
+            className={`sticky left-[22px] ${
               isMenuActive
                 ? 'z-[60] bg-blue-100 ring-2 ring-blue-500 ring-inset'
                 : 'z-30 bg-slate-50 hover:bg-slate-200'
-            } cursor-pointer text-center font-black text-slate-700 text-[13.5px] align-middle px-0.5 tracking-tighter border-r border-r-slate-300 ${mergedCellBorderClass} ${generalDimClass}`}
+            } cursor-pointer text-center font-black text-slate-700 text-[12.5px] align-middle px-0 tracking-tighter border-r border-r-slate-300 ${mergedCellBorderClass} ${generalDimClass}`}
           >
             {busGroup.busNo}
             {busMenuPopover}
@@ -434,7 +434,7 @@ function RosterTableRowComponent(props: Props) {
       )}
 
       <td
-        className={`sticky left-[74px] ${alignClass} py-1 font-extrabold text-slate-900 text-[13px] xl:text-[13.5px] align-middle tracking-tighter cursor-pointer border-r-[2px] border-r-slate-400 ${
+        className={`sticky left-[58px] ${alignClass} py-0.5 font-extrabold text-slate-900 text-[12.5px] xl:text-[13px] align-middle tracking-tighter whitespace-nowrap cursor-pointer border-r-[2px] border-r-slate-400 ${
           isDriverEditing
             ? 'z-[60] bg-blue-100 ring-2 ring-blue-500 ring-inset overflow-visible'
             : 'z-30'
@@ -594,7 +594,7 @@ function RosterTableRowComponent(props: Props) {
 
       {!isPrivate && showLongShifts && (
         <td
-          className={`text-center py-1 border-r-[2px] border-r-slate-500 bg-emerald-50 font-black text-emerald-900 text-[13.5px] align-middle ${borderBottomClass} ${generalDimClass}`}
+          className={`text-center py-0.5 px-0 border-r-[2px] border-r-slate-500 bg-emerald-50 font-black text-emerald-900 text-[12.5px] tracking-tighter whitespace-nowrap align-middle ${borderBottomClass} ${generalDimClass}`}
         >
           {defaultRestDisplay}
         </td>
@@ -711,15 +711,14 @@ function RosterTableRowComponent(props: Props) {
         } else if (isRegularPrivateShift) {
           content = <span className={`${fontWeightClass} ${textColor} whitespace-nowrap`}>{work}</span>;
         } else {
-          // 전10, 후15, 연차 등이 어떤 화면 크기에서도 절대 두 줄로 꺾이지 않도록 whitespace-nowrap 및 글자 수별 최적화
-          let fontSizeClass = 'text-[12px] xl:text-[13px] tracking-tighter';
+          let fontSizeClass = 'text-[12.5px] xl:text-[13.5px] tracking-tighter';
           if (work.length === 3) {
-            fontSizeClass = 'text-[11px] xl:text-[12px] tracking-[-0.08em]';
+            fontSizeClass = 'text-[11.5px] xl:text-[12.5px] tracking-[-0.07em]';
           } else if (work.length >= 4) {
-            fontSizeClass = 'text-[10px] xl:text-[11px] tracking-[-0.09em]';
+            fontSizeClass = 'text-[10.5px] xl:text-[11.5px] tracking-[-0.08em]';
           }
 
-          let pillClass = `m-auto w-[calc(100%-2px)] max-w-[40px] h-[29px] font-black rounded-[4px] ${fontSizeClass} leading-none whitespace-nowrap shadow-xs border flex items-center justify-center px-0 overflow-hidden relative `;
+          let pillClass = `m-auto w-[calc(100%-2px)] max-w-[42px] h-[29px] font-black rounded-[4px] ${fontSizeClass} leading-none whitespace-nowrap shadow-xs border flex items-center justify-center px-0 overflow-hidden relative `;
           if (work.includes('전')) {
             pillClass += 'bg-orange-500 border-orange-600 text-white';
           } else if (work.includes('후')) {
@@ -808,32 +807,33 @@ function RosterTableRowComponent(props: Props) {
         );
       })}
 
+      {/* 우측 통계 열 (여백 px-0 최소화) */}
       {isPrivate ? (
         <>
           <td
-            className={`text-center py-1 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-800 text-[14.5px]">
+            <span className="font-black text-slate-800 text-[13px] tracking-tighter">
               {isCompletelyEmptySlot ? '' : rowStats.totalWorkDays}
             </span>
           </td>
 
           <td
-            className={`text-center py-1 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.jeolnalTotal}
           </td>
 
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-purple-50/50 font-black text-purple-700 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.bokgyeokCount}
           </td>
 
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
-            <span className="font-black text-slate-900 text-[13.5px] xl:text-[14px] tracking-tighter whitespace-nowrap">
+            <span className="font-black text-slate-900 text-[12px] xl:text-[12.5px] tracking-tighter whitespace-nowrap">
               {isCompletelyEmptySlot ? '' : rowStats.expectedSalary.toLocaleString()}
             </span>
           </td>
@@ -841,77 +841,77 @@ function RosterTableRowComponent(props: Props) {
       ) : (
         <>
           <td
-            className={`text-center py-1 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? (
               ''
             ) : isDeficientWorkDays ? (
-              <span className="inline-flex items-center justify-center min-w-[24px] h-[22px] bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[13.5px] shadow-sm">
+              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-0.5 bg-red-50 text-red-600 ring-[1.5px] ring-red-500 rounded font-black text-[12.5px] tracking-tighter">
                 {rowStats.totalWorkDays}
               </span>
             ) : (
-              <span className="font-black text-slate-800 text-[13.5px] xl:text-[14.5px]">{rowStats.totalWorkDays}</span>
+              <span className="font-black text-slate-800 text-[13px] tracking-tighter">{rowStats.totalWorkDays}</span>
             )}
           </td>
           <td
-            className={`text-center py-1 border-r border-r-orange-100 bg-orange-50/40 font-black text-orange-700 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-orange-100 bg-orange-50/40 font-black text-orange-700 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.amCount || 0}
           </td>
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-blue-50/50 font-black text-blue-700 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-blue-50/50 font-black text-blue-700 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.pmCount || 0}
           </td>
 
           <td
-            className={`text-center py-1 border-r border-r-emerald-200 bg-emerald-100/70 font-black text-emerald-950 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-emerald-200 bg-emerald-100/70 font-black text-emerald-950 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.targetSojeong}
           </td>
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-emerald-50/60 font-black text-emerald-900 text-[13px] xl:text-[14px] whitespace-nowrap ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-emerald-50/60 font-black text-emerald-900 text-[12px] xl:text-[12.5px] tracking-tighter whitespace-nowrap ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.fixedRestsStr}
           </td>
           <td
-            className={`text-center py-1 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-rose-100 bg-rose-50/50 font-black text-rose-600 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.jeolnalTotal}
           </td>
           <td
-            className={`text-center py-1 border-r border-r-orange-100 bg-orange-50/40 font-black text-orange-600 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r border-r-orange-100 bg-orange-50/40 font-black text-orange-600 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.overtimeDays}
           </td>
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-red-50/60 font-black text-red-700 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-red-50/60 font-black text-red-700 text-[13px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.extraTotal}
           </td>
 
           <td
-            className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
             {(() => {
               if (isCompletelyEmptySlot) return '';
               const salary = rowStats.expectedSalary;
               if (salary === 0)
-                return <span className="font-black text-slate-900 text-[13px] xl:text-[14px]">0</span>;
+                return <span className="font-black text-slate-900 text-[12px] xl:text-[12.5px]">0</span>;
               if (salary === maxSalary)
                 return (
-                  <span className="inline-flex whitespace-nowrap px-1 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md font-black text-[12px] xl:text-[13px] shadow-xs tracking-tighter">
+                  <span className="inline-flex whitespace-nowrap px-0.5 py-0 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded font-black text-[11.5px] xl:text-[12px] tracking-[-0.06em]">
                     {salary.toLocaleString()}
                   </span>
                 );
               if (salary === minSalary)
                 return (
-                  <span className="inline-flex whitespace-nowrap px-1 py-0.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-md font-black text-[12px] xl:text-[13px] shadow-xs tracking-tighter">
+                  <span className="inline-flex whitespace-nowrap px-0.5 py-0 bg-rose-50 border border-rose-200 text-rose-600 rounded font-black text-[11.5px] xl:text-[12px] tracking-[-0.06em]">
                     {salary.toLocaleString()}
                   </span>
                 );
               return (
-                <span className="font-black text-slate-900 text-[13px] xl:text-[14px] tracking-tighter whitespace-nowrap">
+                <span className="font-black text-slate-900 text-[12px] xl:text-[12.5px] tracking-[-0.06em] whitespace-nowrap">
                   {salary.toLocaleString()}
                 </span>
               );
@@ -925,14 +925,14 @@ function RosterTableRowComponent(props: Props) {
                 return (
                   <td
                     key={shift}
-                    className={`text-center py-1 border-r border-r-amber-100 bg-amber-50/50 font-black text-amber-700 text-[14px] ${borderBottomClass} ${generalDimClass}`}
+                    className={`text-center py-0.5 px-0 border-r border-r-amber-100 bg-amber-50/50 font-black text-amber-700 text-[12.5px] tracking-tighter ${borderBottomClass} ${generalDimClass}`}
                   >
                     {isCompletelyEmptySlot ? '' : count > 0 ? count : 0}
                   </td>
                 );
               })}
               <td
-                className={`text-center py-1 border-r-[2.5px] border-r-slate-700 bg-amber-200 text-amber-950 font-extrabold text-[13px] align-middle leading-tight text-center ${borderBottomClass} ${generalDimClass}`}
+                className={`text-center py-0.5 px-0 border-r-[2.5px] border-r-slate-700 bg-amber-200 text-amber-950 font-extrabold text-[12.5px] tracking-tighter align-middle leading-tight text-center ${borderBottomClass} ${generalDimClass}`}
               >
                 {isCompletelyEmptySlot ? '' : longShiftStats.sum}
               </td>
