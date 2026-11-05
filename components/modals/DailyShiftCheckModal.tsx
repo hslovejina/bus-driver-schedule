@@ -268,7 +268,6 @@ export default function DailyShiftCheckModal({
           </p>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {/* 1. 미배정(누락) 순번 */}
             {result.missing.length > 0 && (
               <div className="bg-white rounded-xl p-3 border border-red-200 shadow-xs">
                 <div className="text-[12.5px] font-black text-red-600 mb-2 flex items-center justify-between">
@@ -318,7 +317,6 @@ export default function DailyShiftCheckModal({
               </div>
             )}
 
-            {/* 2. 중복 배정 순번 */}
             {result.duplicates.length > 0 && (
               <div className="bg-white rounded-xl p-3 border border-amber-300 shadow-xs">
                 <div className="text-[12.5px] font-black text-amber-700 mb-2">
@@ -355,7 +353,6 @@ export default function DailyShiftCheckModal({
               </div>
             )}
 
-            {/* 3. 감차 순번 오배정 */}
             {result.droppedAssigned.length > 0 && (
               <div className="bg-white rounded-xl p-3 border border-purple-200 shadow-xs">
                 <div className="text-[12.5px] font-black text-purple-700 mb-2">
@@ -399,14 +396,20 @@ export default function DailyShiftCheckModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[360] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 bg-black/60 z-[360] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[28px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[88vh] border border-slate-200 animate-in zoom-in-95 duration-150"
+        style={
+          {
+            zoom: 'var(--app-scale, 1)',
+            maxHeight: 'calc(88dvh / var(--app-scale, 1))',
+            maxWidth: 'min(32rem, calc((100vw - 1.5rem) / var(--app-scale, 1)))',
+          } as React.CSSProperties
+        }
+        className="bg-white rounded-[28px] shadow-2xl w-full overflow-hidden flex flex-col border border-slate-200 animate-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
-        {/* 헤더 */}
         <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl">
@@ -437,7 +440,6 @@ export default function DailyShiftCheckModal({
           </button>
         </div>
 
-        {/* 본문 */}
         <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4 bg-white">
           {isPrivate ? (
             renderSection('일일 순번', 'BLUE', amResult)
@@ -457,7 +459,6 @@ export default function DailyShiftCheckModal({
             </>
           )}
 
-          {/* 당일 휴무/연차 요약 */}
           <div className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[13px] font-bold text-slate-600">
             <span className="flex items-center gap-1.5">
               <CalendarDays size={16} className="text-slate-400" /> 당일 휴무 현황
@@ -473,7 +474,6 @@ export default function DailyShiftCheckModal({
           </div>
         </div>
 
-        {/* 하단 닫기 */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
           <button
             type="button"

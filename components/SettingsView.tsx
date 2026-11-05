@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Briefcase, Settings, X, ShieldAlert, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useMobileViewport } from '../hooks/useMobileViewport';
 
 export default function SettingsView() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function SettingsView() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const { containerRef, scale, resetScale } = useMobileViewport();
 
   useEffect(() => {
     const savedUserStr = localStorage.getItem('currentUser');
@@ -101,10 +104,24 @@ export default function SettingsView() {
   const currentRouteInfo = routes.find(r => r.name === currentUser.route);
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-slate-50 text-slate-800 flex flex-col items-center px-4 pt-3 pb-6 lg:py-6">
-      {/* my-auto 적용: PC처럼 화면이 높을 때는 중앙 정렬되고, 스마트폰 가로모드처럼 높이가 낮을 때는 상단 잘림 없이 맨 위부터 표시 */}
-      <div className="w-full max-w-2xl my-auto flex flex-col gap-3 lg:gap-6 xl:gap-7">
-        {/* 상단 타이틀 */}
+    <div
+      ref={containerRef}
+      className="w-full h-full overflow-y-auto bg-slate-50 text-slate-800 flex flex-col items-center px-4 pt-3 pb-6 lg:py-6 relative touch-pan-x touch-pan-y touch-pinch-zoom"
+    >
+      {scale !== 1 && (
+        <button
+          type="button"
+          onClick={resetScale}
+          className="fixed bottom-[48px] right-4 z-[180] px-3 py-1.5 bg-slate-900/90 text-white font-black text-[12px] rounded-full shadow-lg border border-slate-700 active:scale-95"
+        >
+          🔍 {Math.round(scale * 100)}% (터치 시 100%)
+        </button>
+      )}
+
+      <div
+        style={{ zoom: scale } as React.CSSProperties}
+        className="w-full max-w-2xl my-auto flex flex-col gap-3 lg:gap-6 xl:gap-7"
+      >
         <div className="flex items-center gap-2 lg:gap-2.5 px-1 lg:mb-1">
           <Settings size={22} className="text-blue-600 lg:w-[26px] lg:h-[26px]" strokeWidth={2.5} />
           <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-800 tracking-tight">
@@ -112,7 +129,6 @@ export default function SettingsView() {
           </h2>
         </div>
 
-        {/* 1. 계정 정보 */}
         <section>
           <h3 className="text-xs lg:text-[13.5px] font-extrabold text-slate-500 mb-1 lg:mb-2 ml-1.5 flex items-center gap-1 lg:gap-1.5">
             <User size={13} className="lg:w-[15px] lg:h-[15px]" strokeWidth={2.5} /> 계정 정보
@@ -150,7 +166,6 @@ export default function SettingsView() {
           </div>
         </section>
 
-        {/* 2. 근무 정보 설정 */}
         <section>
           <h3 className="text-xs lg:text-[13.5px] font-extrabold text-slate-500 mb-1 lg:mb-2 ml-1.5 flex items-center gap-1 lg:gap-1.5">
             <Briefcase size={13} className="lg:w-[15px] lg:h-[15px]" strokeWidth={2.5} /> 근무 정보 설정
@@ -188,7 +203,6 @@ export default function SettingsView() {
           </div>
         </section>
 
-        {/* 3. 관리자 대시보드 입장 카드 */}
         {currentUser.role === 'ADMIN' && (
           <div className="bg-slate-800 rounded-2xl p-3.5 lg:p-5 shadow-sm border border-slate-700 animate-in fade-in">
             <div className="flex items-center gap-1.5 lg:gap-2 mb-2 lg:mb-3.5">
@@ -207,7 +221,6 @@ export default function SettingsView() {
           </div>
         )}
 
-        {/* 4. 로그아웃 버튼 */}
         <button
           onClick={handleLogout}
           className="w-full bg-white border border-red-200 hover:bg-red-50 text-red-500 py-2.5 lg:py-3.5 rounded-2xl font-extrabold text-[14px] lg:text-[15.5px] transition flex items-center justify-center gap-1.5 lg:gap-2 active:scale-95 shadow-xs"
@@ -215,7 +228,6 @@ export default function SettingsView() {
           <LogOut size={16} className="lg:w-[18px] lg:h-[18px]" strokeWidth={2.5} /> 로그아웃
         </button>
 
-        {/* 5. 제작자 표기 푸터 */}
         <div className="w-full text-center pt-1 lg:pt-2 flex flex-col items-center justify-center gap-0.5 lg:gap-1">
           <p className="text-[11.5px] lg:text-[12.5px] font-bold text-slate-500 tracking-tight leading-none">
             Designed & Developed by <strong className="text-slate-800 font-extrabold">Kim Hyun-Soo</strong>
@@ -227,8 +239,17 @@ export default function SettingsView() {
       </div>
 
       {activeModal === 'PASSWORD' && (
-        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-sm max-h-[92dvh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 z-[300] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            style={
+              {
+                zoom: 'var(--app-scale, 1)',
+                maxHeight: 'calc(90dvh / var(--app-scale, 1))',
+                maxWidth: 'min(24rem, calc((100vw - 1.5rem) / var(--app-scale, 1)))',
+              } as React.CSSProperties
+            }
+            className="bg-white rounded-[24px] shadow-2xl w-full overflow-y-auto animate-in zoom-in-95 duration-200"
+          >
             <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50">
               <h3 className="font-black text-[18px] text-slate-800">비밀번호 변경</h3>
               <button

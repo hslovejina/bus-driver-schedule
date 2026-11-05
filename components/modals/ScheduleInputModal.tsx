@@ -36,6 +36,7 @@ interface Props {
   baseWork?: string;
   hasBaseSchedule?: boolean;
   onOpenSubstitutes?: () => void;
+  scale?: number;
 }
 
 export default function ScheduleInputModal({
@@ -53,6 +54,7 @@ export default function ScheduleInputModal({
   baseWork = '',
   hasBaseSchedule = false,
   onOpenSubstitutes,
+  scale = 1,
 }: Props) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -73,21 +75,21 @@ export default function ScheduleInputModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const hasUserDraggedRef = useRef<boolean>(false);
 
-  // 선택된 입력 칸(셀)을 가리지 않는 최적의 모달 좌표를 계산하는 함수
+  // 확대/축소 배율(scale)이 반영된 실제 크기 기준으로 입력 칸을 가리지 않는 최적 위치 계산
   const updateSmartPosition = useCallback(() => {
     if (!modalObj || !modalRef.current) return;
 
     const modalEl = modalRef.current;
     const modalRect = modalEl.getBoundingClientRect();
-    const modalW = modalRect.width || 360;
-    const modalH = modalRect.height || 380;
+    const modalW = modalRect.width || 350 * scale;
+    const modalH = modalRect.height || 380 * scale;
 
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const margin = 12;
-    const topSafe = 52;
-    const bottomSafe = vh - 46;
-    const cellGap = 22;
+    const margin = Math.max(6, Math.round(10 * scale));
+    const topSafe = Math.max(36, Math.round(48 * scale));
+    const bottomSafe = vh - 42;
+    const cellGap = Math.max(12, Math.round(20 * scale));
 
     if (hasUserDraggedRef.current) {
       setPosition(prev => ({
@@ -109,8 +111,22 @@ export default function ScheduleInputModal({
       return;
     }
 
-    const cellRect = cellEl.getBoundingClientRect();
-    const stickyLeftEdge = isPrivate ? 206 : 114;
+    const rawCellRect = cellEl.getBoundingClientRect();
+    // 브라우저별 CSS zoom 좌표계 차이 자동 보정
+    const needsZoomMultiply =
+      scale !== 1 &&
+      cellEl.offsetWidth > 0 &&
+      Math.abs(rawCellRect.width - cellEl.offsetWidth) < 0.5;
+    const factor = needsZoomMultiply ? scale : 1;
+
+    const cellRect = {
+      left: rawCellRect.left * factor,
+      right: rawCellRect.right * factor,
+      top: rawCellRect.top * factor,
+      bottom: rawCellRect.bottom * factor,
+    };
+
+    const stickyLeftEdge = Math.round((isPrivate ? 206 : 114) * scale);
 
     const spaceRight = vw - margin - (cellRect.right + cellGap);
     const spaceLeftFromSticky = cellRect.left - cellGap - stickyLeftEdge;
@@ -122,12 +138,12 @@ export default function ScheduleInputModal({
     let targetY = topSafe;
 
     if (spaceRight >= modalW) {
-      targetX = Math.min(cellRect.right + cellGap + 8, vw - modalW - margin);
-      const idealY = cellRect.top - 16;
+      targetX = Math.min(cellRect.right + cellGap + 6, vw - modalW - margin);
+      const idealY = cellRect.top - 12 * scale;
       targetY = Math.min(Math.max(topSafe, idealY), Math.max(topSafe, bottomSafe - modalH));
     } else if (spaceLeftFromSticky >= modalW || spaceLeftTotal >= modalW) {
       const minLeftX = spaceLeftFromSticky >= modalW ? stickyLeftEdge : margin;
-      targetX = Math.max(minLeftX, cellRect.left - modalW - cellGap - 8);
+      targetX = Math.max(minLeftX, cellRect.left - modalW - cellGap - 6);
 
       if (spaceBelow >= modalH) {
         targetY = cellRect.bottom + cellGap;
@@ -158,7 +174,7 @@ export default function ScheduleInputModal({
       x: Math.round(targetX),
       y: Math.round(targetY),
     });
-  }, [modalObj, isPrivate]);
+  }, [modalObj, isPrivate, scale]);
 
   useEffect(() => {
     if (!modalObj) return;
@@ -186,7 +202,12 @@ export default function ScheduleInputModal({
     };
   }, [modalObj, updateSmartPosition]);
 
-  // ✨ PC 키보드 단축키 지원 (ESC: 뒤로/닫기, Delete/Backspace: 빈칸 비우기, 1/2: 오전/오후 선택창)
+  // 화면 확대/축소 배율(scale)이 실시간으로 바뀔 때도 모달 위치 즉시 재조정
+  useEffect(() => {
+    if (!modalObj) return;
+    updateSmartPosition();
+  }, [scale, modalObj, updateSmartPosition]);
+
   useEffect(() => {
     if (!modalObj) return;
 
@@ -341,15 +362,25 @@ export default function ScheduleInputModal({
     return 'bg-indigo-600 text-white border-indigo-700';
   };
 
+  const effectiveScale = isDragging ? scale * 1.02 : scale;
+
   return (
     <div
       ref={modalRef}
-      className={`fixed bg-white text-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.25)] rounded-[24px] xl:rounded-[28px] border border-slate-200 w-[350px] sm:w-[370px] max-h-[94dvh] z-[220] flex flex-col overflow-hidden transition-none ${
+      className={`fixed bg-white text-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.25)] rounded-[24px] xl:rounded-[28px] border border-slate-200 w-[350px] sm:w-[370px] z-[220] flex flex-col overflow-hidden transition-none ${
         isDragging
-          ? 'opacity-90 scale-[1.02] shadow-[0_20px_50px_rgba(0,0,0,0.3)]'
-          : 'opacity-100 animate-in zoom-in-95 duration-200'
+          ? 'opacity-90 shadow-[0_20px_50px_rgba(0,0,0,0.3)]'
+          : 'opacity-100 animate-in fade-in duration-150'
       }`}
-      style={{ left: `${position.x}px`, top: `${position.y}px`, touchAction: 'none' }}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        transform: `scale(${effectiveScale})`,
+        transformOrigin: 'top left',
+        maxHeight: `calc((100dvh - 96px) / ${scale})`,
+        maxWidth: `calc((100vw - 16px) / ${scale})`,
+        touchAction: 'none',
+      }}
     >
       {/* 상단 드래그 헤더 */}
       <div

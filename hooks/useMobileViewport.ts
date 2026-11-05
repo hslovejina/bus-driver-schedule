@@ -4,13 +4,49 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 export function useMobileViewport() {
-  const [scale, setScale] = useState<number>(1);
+  const [scale, setScale] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('appZoomScale');
+      const parsed = saved ? parseFloat(saved) : 1;
+      if (!isNaN(parsed) && parsed >= 0.45 && parsed <= 1.8) {
+        return parsed;
+      }
+    }
+    return 1;
+  });
   const [isPortraitMobile, setIsPortraitMobile] = useState<boolean>(false);
   const [dismissedGuard, setDismissedGuard] = useState<boolean>(true);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef<number>(1);
+
+  // 전역 CSS 변수(--app-scale) 및 탭 간 배율 동기화
+  const applyScale = useCallback((nextScale: number) => {
+    const clamped = Math.round(Math.min(1.8, Math.max(0.45, nextScale)) * 100) / 100;
+    setScale(clamped);
+    if (typeof window !== 'undefined') {
+      document.documentElement.style.setProperty('--app-scale', String(clamped));
+      sessionStorage.setItem('appZoomScale', String(clamped));
+      window.dispatchEvent(new CustomEvent('app-scale-change', { detail: clamped }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.documentElement.style.setProperty('--app-scale', String(scale));
+    }
+
+    const handleExternalScale = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (typeof customEvent.detail === 'number') {
+        setScale(customEvent.detail);
+      }
+    };
+
+    window.addEventListener('app-scale-change', handleExternalScale);
+    return () => window.removeEventListener('app-scale-change', handleExternalScale);
+  }, [scale]);
 
   const forceEnterLandscape = useCallback(async () => {
     try {
@@ -45,7 +81,7 @@ export function useMobileViewport() {
     };
   }, []);
 
-  // 두 손가락 스와이프(Pinch-to-Zoom)로 제목행 + 배차표 동시 확대(180%) 및 축소(45%)
+  // 두 손가락 스와이프(Pinch-to-Zoom)로 제목행 + 배차표 + 모든 모달창 동시 확대(180%) 및 축소(45%)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -68,8 +104,7 @@ export function useMobileViewport() {
         if (e.cancelable) e.preventDefault();
         const currentDist = getDistance(e.touches);
         const ratio = currentDist / pinchStartDistRef.current;
-        const nextScale = Math.min(1.8, Math.max(0.45, pinchStartScaleRef.current * ratio));
-        setScale(Math.round(nextScale * 100) / 100);
+        applyScale(pinchStartScaleRef.current * ratio);
       }
     };
 
@@ -90,9 +125,9 @@ export function useMobileViewport() {
       el.removeEventListener('touchend', handleTouchEnd);
       el.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [scale]);
+  }, [scale, applyScale]);
 
-  const resetScale = useCallback(() => setScale(1), []);
+  const resetScale = useCallback(() => applyScale(1), [applyScale]);
 
   return {
     containerRef,

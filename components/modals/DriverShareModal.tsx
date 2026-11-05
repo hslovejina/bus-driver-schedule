@@ -150,14 +150,20 @@ export default function DriverShareModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[350] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/60 z-[350] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[28px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200 border border-slate-200"
+        style={
+          {
+            zoom: 'var(--app-scale, 1)',
+            maxHeight: 'calc(88dvh / var(--app-scale, 1))',
+            maxWidth: 'min(32rem, calc((100vw - 1.5rem) / var(--app-scale, 1)))',
+          } as React.CSSProperties
+        }
+        className="bg-white rounded-[28px] shadow-2xl w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* 상단 헤더 */}
         <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl">
@@ -181,7 +187,6 @@ export default function DriverShareModal({
           </button>
         </div>
 
-        {/* 공유 옵션 바 */}
         <div className="px-6 py-3.5 bg-indigo-50/60 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-indigo-200 shadow-sm">
             <ListFilter size={15} className="text-indigo-500 ml-1.5" />
@@ -221,14 +226,12 @@ export default function DriverShareModal({
           </label>
         </div>
 
-        {/* 미리보기 텍스트 박스 */}
         <div className="p-5 flex-1 overflow-y-auto bg-slate-100/70">
           <pre className="w-full p-4 bg-white rounded-2xl border border-slate-200 text-[13.5px] font-bold text-slate-800 whitespace-pre-wrap leading-relaxed font-sans shadow-inner select-all">
             {shareText}
           </pre>
         </div>
 
-        {/* 하단 액션 버튼 */}
         <div className="p-4 bg-white border-t border-slate-200 flex items-center gap-2.5 shrink-0">
           <button
             type="button"

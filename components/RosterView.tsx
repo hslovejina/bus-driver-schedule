@@ -1916,6 +1916,7 @@ export default function RosterView() {
         baseWork={selectedCellInfo.baseWork}
         hasBaseSchedule={selectedCellInfo.hasBaseSchedule}
         onOpenSubstitutes={() => setIsSubstituteModalOpen(true)}
+        scale={scale}
       />
 
       <SubstituteListModal

@@ -41,14 +41,20 @@ export default function SubstituteListModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[320] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/60 z-[320] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[28px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200"
+        style={
+          {
+            zoom: 'var(--app-scale, 1)',
+            maxHeight: 'calc(88dvh / var(--app-scale, 1))',
+            maxWidth: 'min(32rem, calc((100vw - 1.5rem) / var(--app-scale, 1)))',
+          } as React.CSSProperties
+        }
+        className="bg-white rounded-[28px] shadow-2xl w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* 상단 헤더 */}
         <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
@@ -81,7 +87,6 @@ export default function SubstituteListModal({
           </div>
         </div>
 
-        {/* 원클릭 배정 시 기존 기사 휴무 처리 옵션 */}
         <div className="px-6 py-3.5 bg-indigo-50/70 border-b border-indigo-100 flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-[12.5px] font-extrabold text-indigo-900">
@@ -114,7 +119,6 @@ export default function SubstituteListModal({
           </div>
         </div>
 
-        {/* 기사 성명 목록 영역 */}
         <div className="p-5 overflow-y-auto flex-1 bg-white">
           {candidates.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-center gap-3">
@@ -169,7 +173,6 @@ export default function SubstituteListModal({
           )}
         </div>
 
-        {/* 하단 닫기 영역 */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
           <span className="text-[13.5px] font-extrabold text-slate-600 flex items-center gap-1.5 pl-2">
             <CheckCircle2 size={17} className="text-emerald-600" strokeWidth={2.5} />총{' '}

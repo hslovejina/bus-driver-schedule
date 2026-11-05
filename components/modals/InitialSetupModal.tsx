@@ -25,11 +25,18 @@ export default function InitialSetupModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[340] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 bg-black/60 z-[340] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-white text-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.25)] rounded-[28px] border border-slate-200 w-full max-w-[410px] max-h-[92dvh] overflow-y-auto animate-in zoom-in-95 duration-200"
+        style={
+          {
+            zoom: 'var(--app-scale, 1)',
+            maxHeight: 'calc(90dvh / var(--app-scale, 1))',
+            maxWidth: 'min(410px, calc((100vw - 1.5rem) / var(--app-scale, 1)))',
+          } as React.CSSProperties
+        }
+        className="bg-white text-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.25)] rounded-[28px] border border-slate-200 w-full overflow-y-auto animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-7 flex flex-col items-center text-center">
