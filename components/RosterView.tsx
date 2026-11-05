@@ -181,6 +181,59 @@ export default function RosterView() {
 
   const isModalActive = !!scheduleModalObj;
 
+  // ✨ 순번점검 모달 등에서 기사 클릭 시 해당 기사의 행·열 칸이 화면 밖에 있으면 자동으로 중앙에 보이도록 스크롤 이동
+  useEffect(() => {
+    if (!scheduleModalObj) return;
+    const { bIdx, dIdx, day } = scheduleModalObj;
+
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      const cellEl = document.getElementById(`roster-cell-${bIdx}-${dIdx}-${day}`);
+      if (!container || !cellEl) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const cellRect = cellEl.getBoundingClientRect();
+
+      // 상단 고정 헤더(thead), 하단 고정 합계행(tfoot), 좌측 고정열(성명까지)의 크기를 감안한 실제 가시 영역
+      const stickyTopHeight = 52;
+      const stickyBottomHeight = 72;
+      const stickyLeftWidth = 115;
+
+      const visibleTop = containerRect.top + stickyTopHeight;
+      const visibleBottom = containerRect.bottom - stickyBottomHeight;
+      const visibleLeft = containerRect.left + stickyLeftWidth;
+      const visibleRight = containerRect.right - 20;
+
+      let nextScrollTop = container.scrollTop;
+      let nextScrollLeft = container.scrollLeft;
+      let shouldScroll = false;
+
+      if (cellRect.top < visibleTop || cellRect.bottom > visibleBottom) {
+        const cellCenterY = cellRect.top + cellRect.height / 2;
+        const visibleCenterY = (visibleTop + visibleBottom) / 2;
+        nextScrollTop = container.scrollTop + (cellCenterY - visibleCenterY);
+        shouldScroll = true;
+      }
+
+      if (cellRect.left < visibleLeft || cellRect.right > visibleRight) {
+        const cellCenterX = cellRect.left + cellRect.width / 2;
+        const visibleCenterX = (visibleLeft + visibleRight) / 2;
+        nextScrollLeft = container.scrollLeft + (cellCenterX - visibleCenterX);
+        shouldScroll = true;
+      }
+
+      if (shouldScroll) {
+        container.scrollTo({
+          top: Math.max(0, nextScrollTop),
+          left: Math.max(0, nextScrollLeft),
+          behavior: 'smooth',
+        });
+      }
+    }, 30);
+
+    return () => clearTimeout(timer);
+  }, [scheduleModalObj, containerRef]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -900,11 +953,8 @@ export default function RosterView() {
 
   const headerRowSpan = showLongShifts && sortedLongShifts.length > 0 && !isPrivate ? 2 : 1;
 
-  // ✨ 기준점 기반 좌/우 통계 열 최소 폭 산출 (남는 모든 가로 공간을 날짜 배차열에 배분)
-  // 좌측: 순서(22px, 숫자2자리) + 차번(36px, 숫자4자리) + 성명(52px, 한글4자리) = 110px
   const isDesktop = containerWidth >= 1024;
   const leftStickyWidth = 22 + 36 + 52;
-  // 우측: 숫자2자리(25~26px), 오전/오후(22px), 고정휴무 한글2자리(28px), 예상급여 9자리(68px)
   const rightStatsCols = isPrivate
     ? [26, 26, 26, 68]
     : [26, 22, 22, 26, 28, 25, 26, 26, 68];
@@ -918,7 +968,7 @@ export default function RosterView() {
 
   const extraColsWidth = useMemo(() => {
     if (isPrivate || !showLongShifts) return 0;
-    const restCol = 28; // 기본휴무 (한글 2자리)
+    const restCol = 28;
     const longCols = sortedLongShifts.length > 0 ? sortedLongShifts.length * 26 + 28 : 0;
     return restCol + longCols;
   }, [isPrivate, showLongShifts, sortedLongShifts.length]);
@@ -1321,7 +1371,7 @@ export default function RosterView() {
               <tr className="border-0">
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-0 w-[22px] py-1 font-black text-[10.5px] align-middle px-0 leading-[1.1] ${cornerActive1}`}
+                  className={`sticky left-0 w-[22px] py-0.5 font-black text-[10.5px] align-middle px-0 leading-[1.1] ${cornerActive1}`}
                 >
                   {isPrivate ? (
                     '조'
@@ -1333,13 +1383,13 @@ export default function RosterView() {
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[22px] w-[36px] py-1 font-black text-[12px] align-middle tracking-tighter px-0 ${cornerActive2}`}
+                  className={`sticky left-[22px] w-[36px] py-0.5 font-black text-[12px] align-middle tracking-tighter px-0 ${cornerActive2}`}
                 >
                   차번
                 </th>
                 <th
                   rowSpan={headerRowSpan}
-                  className={`sticky left-[58px] w-[52px] py-1 font-black text-[12.5px] align-middle tracking-tighter px-0 ${cornerActive3}`}
+                  className={`sticky left-[58px] w-[52px] py-0.5 font-black text-[12.5px] align-middle tracking-tighter px-0 ${cornerActive3}`}
                 >
                   성명
                 </th>
@@ -1349,7 +1399,7 @@ export default function RosterView() {
                     rowSpan={headerRowSpan}
                     onClick={handleAutoExtractRestDaysUI}
                     title="클릭 시 미지정(-) 기사의 기본휴무만 자동 설정합니다 (이미 지정된 기본휴무는 유지)"
-                    className={`py-1 px-0 border-r-[2px] border-r-slate-500 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[10.5px] align-middle leading-[1.1] cursor-pointer transition-colors select-none ${generalDimClass}`}
+                    className={`py-0.5 px-0 border-r-[2px] border-r-slate-500 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[10.5px] align-middle leading-[1.1] cursor-pointer transition-colors select-none ${generalDimClass}`}
                   >
                     기본<br />휴무
                   </th>
@@ -1391,24 +1441,24 @@ export default function RosterView() {
                     <th
                       key={day}
                       rowSpan={headerRowSpan}
-                      className={`py-1 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
+                      className={`py-0.5 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
                     >
                       <div className="flex flex-col items-center justify-start h-full gap-0.5 pt-0.5 px-0 w-full">
-                        <span className={`text-[13.5px] xl:text-[14.5px] font-black leading-none ${dateColor}`}>
+                        <span className={`text-[13px] xl:text-[14px] font-black leading-none ${dateColor}`}>
                           {day}
                         </span>
-                        <span className={`text-[10px] xl:text-[11px] font-bold leading-none ${dowColor}`}>
+                        <span className={`text-[9.5px] xl:text-[10.5px] font-bold leading-none ${dowColor}`}>
                           {getDayOfWeekText(day)}
                         </span>
                         {dayType === 'JEOLNAL' && holidays[dateStr] ? (
                           <span
-                            className="text-[8.5px] font-extrabold text-red-500 tracking-tighter w-full mt-0.5 leading-tight truncate"
+                            className="text-[8.5px] font-extrabold text-red-500 tracking-tighter w-full leading-tight truncate"
                             title={holidays[dateStr]}
                           >
                             {holidays[dateStr]}
                           </span>
                         ) : isToday ? (
-                          <span className="text-[8px] font-black bg-blue-600 text-white px-0.5 rounded mt-0.5 leading-tight">
+                          <span className="text-[8px] font-black bg-blue-600 text-white px-0.5 rounded leading-tight">
                             오늘
                           </span>
                         ) : null}
@@ -1421,25 +1471,25 @@ export default function RosterView() {
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
                     >
                       합<br />계
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-purple-400 bg-purple-100 text-purple-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-purple-400 bg-purple-100 text-purple-800 font-extrabold text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
                     >
                       복격<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[12px] align-middle tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[12px] align-middle tracking-tighter ${generalDimClass}`}
                     >
                       예상급여
                     </th>
@@ -1448,58 +1498,58 @@ export default function RosterView() {
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-slate-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-600 bg-slate-200 text-slate-800 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       총<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
                     >
                       오<br />전
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-blue-400 bg-blue-50 text-blue-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-blue-400 bg-blue-50 text-blue-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] ${generalDimClass}`}
                     >
                       오<br />후
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-emerald-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-500 bg-emerald-100 text-emerald-950 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-emerald-300 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-500 bg-emerald-100 text-emerald-950 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       소정<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       고정<br />휴무
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-rose-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-rose-400 bg-rose-50 text-rose-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r border-r-orange-200 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-orange-400 bg-orange-50 text-orange-700 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       연장<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-red-400 bg-red-100 text-red-800 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-red-400 bg-red-100 text-red-800 font-extrabold text-[10.5px] xl:text-[11px] align-middle leading-[1.1] tracking-tighter ${generalDimClass}`}
                     >
                       추가<br />합계
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`py-1 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[11.5px] xl:text-[12px] align-middle tracking-tighter ${generalDimClass}`}
+                      className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b-[2.5px] border-b-slate-800 bg-slate-700 text-white font-extrabold text-[11.5px] xl:text-[12px] align-middle tracking-tighter ${generalDimClass}`}
                     >
                       예상급여
                     </th>
@@ -1507,7 +1557,7 @@ export default function RosterView() {
                     {!isPrivate && showLongShifts && sortedLongShifts.length > 0 && (
                       <th
                         colSpan={sortedLongShifts.length + 1}
-                        className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b border-b-amber-300 bg-amber-100 text-amber-950 font-extrabold text-[11.5px] align-middle leading-tight text-center ${generalDimClass}`}
+                        className={`py-0.5 px-0 border-r-[2.5px] border-r-slate-700 border-t-[2.5px] border-t-slate-700 border-b border-b-amber-300 bg-amber-100 text-amber-950 font-extrabold text-[11px] align-middle leading-tight text-center ${generalDimClass}`}
                       >
                         긴근무 순번
                       </th>

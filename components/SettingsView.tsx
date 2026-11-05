@@ -101,44 +101,47 @@ export default function SettingsView() {
   const currentRouteInfo = routes.find(r => r.name === currentUser.route);
 
   return (
-    <div className="w-full h-full overflow-hidden bg-slate-50 text-slate-800 flex flex-col items-center justify-center px-4 py-2">
-      <div className="w-full max-w-2xl flex flex-col gap-3">
+    <div className="w-full h-full overflow-y-auto bg-slate-50 text-slate-800 flex flex-col items-center justify-center px-4 py-2 lg:py-6">
+      {/* 스마트폰(gap-3)은 현행 컴팩트 유지, PC(lg:gap-6 xl:gap-7)는 제목행과 각 테마행 사이 간격을 넓혀 가시성 향상 */}
+      <div className="w-full max-w-2xl flex flex-col gap-3 lg:gap-6 xl:gap-7">
         {/* 상단 타이틀 */}
-        <div className="flex items-center gap-2 px-1">
-          <Settings size={22} className="text-blue-600" strokeWidth={2.5} />
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-800 tracking-tight">내 정보 설정</h2>
+        <div className="flex items-center gap-2 lg:gap-2.5 px-1 lg:mb-1">
+          <Settings size={22} className="text-blue-600 lg:w-[26px] lg:h-[26px]" strokeWidth={2.5} />
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-800 tracking-tight">
+            내 정보 설정
+          </h2>
         </div>
 
         {/* 1. 계정 정보 */}
         <section>
-          <h3 className="text-xs font-extrabold text-slate-500 mb-1 ml-1.5 flex items-center gap-1">
-            <User size={13} strokeWidth={2.5} /> 계정 정보
+          <h3 className="text-xs lg:text-[13.5px] font-extrabold text-slate-500 mb-1 lg:mb-2 ml-1.5 flex items-center gap-1 lg:gap-1.5">
+            <User size={13} className="lg:w-[15px] lg:h-[15px]" strokeWidth={2.5} /> 계정 정보
           </h3>
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
             <div className="flex border-b border-slate-100">
-              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 sm:py-2.5 border-r border-slate-100 flex items-center justify-center text-[13.5px]">
+              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 lg:py-3.5 xl:py-4 border-r border-slate-100 flex items-center justify-center text-[13.5px] lg:text-[15px]">
                 이름
               </div>
-              <div className="w-[70%] sm:w-[75%] px-4 font-extrabold text-[14.5px] flex items-center">
+              <div className="w-[70%] sm:w-[75%] px-4 lg:px-5 font-extrabold text-[14.5px] lg:text-[16px] flex items-center">
                 {currentUser.name}
               </div>
             </div>
             <div className="flex border-b border-slate-100">
-              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 sm:py-2.5 border-r border-slate-100 flex items-center justify-center text-[13.5px]">
+              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 lg:py-3.5 xl:py-4 border-r border-slate-100 flex items-center justify-center text-[13.5px] lg:text-[15px]">
                 사원번호
               </div>
-              <div className="w-[70%] sm:w-[75%] px-4 font-extrabold text-[14.5px] flex items-center">
+              <div className="w-[70%] sm:w-[75%] px-4 lg:px-5 font-extrabold text-[14.5px] lg:text-[16px] flex items-center">
                 {currentUser.empId}
               </div>
             </div>
             <div className="flex">
-              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 sm:py-2.5 border-r border-slate-100 flex items-center justify-center text-[13.5px]">
+              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 lg:py-3.5 xl:py-4 border-r border-slate-100 flex items-center justify-center text-[13.5px] lg:text-[15px]">
                 비밀번호
               </div>
-              <div className="w-[70%] sm:w-[75%] px-4 py-1.5 flex items-center">
+              <div className="w-[70%] sm:w-[75%] px-4 lg:px-5 py-1.5 lg:py-2.5 flex items-center">
                 <button
                   onClick={() => setActiveModal('PASSWORD')}
-                  className="w-full sm:w-auto px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors active:scale-95 text-[13px]"
+                  className="w-full sm:w-auto px-4 lg:px-5 py-1.5 lg:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors active:scale-95 text-[13px] lg:text-[14px]"
                 >
                   변경하기
                 </button>
@@ -149,18 +152,18 @@ export default function SettingsView() {
 
         {/* 2. 근무 정보 설정 */}
         <section>
-          <h3 className="text-xs font-extrabold text-slate-500 mb-1 ml-1.5 flex items-center gap-1">
-            <Briefcase size={13} strokeWidth={2.5} /> 근무 정보 설정
+          <h3 className="text-xs lg:text-[13.5px] font-extrabold text-slate-500 mb-1 lg:mb-2 ml-1.5 flex items-center gap-1 lg:gap-1.5">
+            <Briefcase size={13} className="lg:w-[15px] lg:h-[15px]" strokeWidth={2.5} /> 근무 정보 설정
           </h3>
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200 flex flex-col overflow-hidden">
             <div className="flex">
-              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 sm:py-2.5 border-r border-slate-100 flex items-center justify-center text-[13.5px]">
+              <div className="w-[30%] sm:w-[25%] bg-slate-50 font-bold py-2 lg:py-3.5 xl:py-4 border-r border-slate-100 flex items-center justify-center text-[13.5px] lg:text-[15px]">
                 관리노선
               </div>
 
-              <div className="w-[70%] sm:w-[75%] px-4 py-2 flex items-center gap-2">
+              <div className="w-[70%] sm:w-[75%] px-4 lg:px-5 py-2 lg:py-3 flex items-center gap-2">
                 <span
-                  className={`font-extrabold text-[14.5px] border px-2.5 py-0.5 rounded-lg ${
+                  className={`font-extrabold text-[14.5px] lg:text-[15.5px] border px-2.5 lg:px-3 py-0.5 lg:py-1 rounded-lg ${
                     currentUser.route === '미지정'
                       ? 'text-slate-500 bg-slate-100 border-slate-200'
                       : 'text-blue-600 bg-blue-50 border-blue-100'
@@ -171,7 +174,7 @@ export default function SettingsView() {
 
                 {currentUser.route !== '미지정' && currentRouteInfo && (
                   <span
-                    className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold tracking-wide border ${
+                    className={`px-2 py-0.5 rounded-md text-[11px] lg:text-[12px] font-extrabold tracking-wide border ${
                       currentRouteInfo.routeType === 'PRIVATE'
                         ? 'bg-orange-100 text-orange-700 border-orange-200'
                         : 'bg-indigo-100 text-indigo-700 border-indigo-200'
@@ -187,17 +190,17 @@ export default function SettingsView() {
 
         {/* 3. 관리자 대시보드 입장 카드 */}
         {currentUser.role === 'ADMIN' && (
-          <div className="bg-slate-800 rounded-2xl p-3.5 shadow-sm border border-slate-700 animate-in fade-in">
-            <div className="flex items-center gap-1.5 mb-2">
-              <ShieldAlert size={18} className="text-yellow-400" strokeWidth={2.5} />
-              <h3 className="font-bold text-white text-[13.5px]">관리자 권한 활성화됨</h3>
+          <div className="bg-slate-800 rounded-2xl p-3.5 lg:p-5 shadow-sm border border-slate-700 animate-in fade-in">
+            <div className="flex items-center gap-1.5 lg:gap-2 mb-2 lg:mb-3.5">
+              <ShieldAlert size={18} className="text-yellow-400 lg:w-[22px] lg:h-[22px]" strokeWidth={2.5} />
+              <h3 className="font-bold text-white text-[13.5px] lg:text-[15.5px]">관리자 권한 활성화됨</h3>
             </div>
             <button
               onClick={() => {
                 sessionStorage.setItem('returnToSettings', 'true');
                 router.push('/admin');
               }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[14px] py-2.5 rounded-xl shadow-xs transition-all active:scale-95"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[14px] lg:text-[15.5px] py-2.5 lg:py-3.5 rounded-xl shadow-xs transition-all active:scale-95"
             >
               관리자 대시보드 입장하기
             </button>
@@ -207,17 +210,19 @@ export default function SettingsView() {
         {/* 4. 로그아웃 버튼 */}
         <button
           onClick={handleLogout}
-          className="w-full bg-white border border-red-200 hover:bg-red-50 text-red-500 py-2.5 rounded-2xl font-extrabold text-[14px] transition flex items-center justify-center gap-1.5 active:scale-95 shadow-xs"
+          className="w-full bg-white border border-red-200 hover:bg-red-50 text-red-500 py-2.5 lg:py-3.5 rounded-2xl font-extrabold text-[14px] lg:text-[15.5px] transition flex items-center justify-center gap-1.5 lg:gap-2 active:scale-95 shadow-xs"
         >
-          <LogOut size={16} strokeWidth={2.5} /> 로그아웃
+          <LogOut size={16} className="lg:w-[18px] lg:h-[18px]" strokeWidth={2.5} /> 로그아웃
         </button>
 
-        {/* 5. 제작자 표기 푸터 (로그아웃 버튼 바로 아래에 여백 최소화 배치) */}
-        <div className="w-full text-center pt-1 flex flex-col items-center justify-center gap-0.5">
-          <p className="text-[11.5px] font-bold text-slate-500 tracking-tight leading-none">
+        {/* 5. 제작자 표기 푸터 */}
+        <div className="w-full text-center pt-1 lg:pt-2 flex flex-col items-center justify-center gap-0.5 lg:gap-1">
+          <p className="text-[11.5px] lg:text-[12.5px] font-bold text-slate-500 tracking-tight leading-none">
             Designed & Developed by <strong className="text-slate-800 font-extrabold">Kim Hyun-Soo</strong>
           </p>
-          <p className="text-[10.5px] font-semibold text-slate-400 leading-none mt-0.5">© 2026 배차메이커.</p>
+          <p className="text-[10.5px] lg:text-[11.5px] font-semibold text-slate-400 leading-none mt-0.5">
+            © 2026 배차메이커.
+          </p>
         </div>
       </div>
 
