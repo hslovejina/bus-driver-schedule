@@ -8,13 +8,19 @@ export async function POST(request: Request) {
     const { action } = body;
 
     if (action === 'GET_SETTINGS') {
-      let setting = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
+      let [setting, configRecord] = await Promise.all([
+        prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
+        prisma.monthlyRoster.findUnique({
+          where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+        }),
+      ]);
+
       if (!setting) {
-        setting = await prisma.systemSetting.create({ data: { id: 'GLOBAL', baseHourlyWage: 16911 } });
+        setting = await prisma.systemSetting.create({
+          data: { id: 'GLOBAL', baseHourlyWage: 16911 },
+        });
       }
-      const configRecord = await prisma.monthlyRoster.findUnique({
-        where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
-      });
+
       return NextResponse.json({
         ...setting,
         payConfig: (configRecord?.rosterData as any) || { publicRules: [], privateRules: [] },
@@ -147,7 +153,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ success: true, payConfig: currentPayConfig });
     }
-    
+
     if (action === 'GET_USERS') {
       const users = await prisma.user.findMany({ orderBy: { empId: 'asc' } });
       return NextResponse.json(users);
@@ -173,7 +179,8 @@ export async function POST(request: Request) {
     if (action === 'DELETE_USER') {
       const { id } = body;
       const user = await prisma.user.findUnique({ where: { id } });
-      if (user?.role === 'ADMIN') return NextResponse.json({ error: '관리자는 삭제할 수 없습니다.' }, { status: 400 });
+      if (user?.role === 'ADMIN')
+        return NextResponse.json({ error: '관리자는 삭제할 수 없습니다.' }, { status: 400 });
       await prisma.user.delete({ where: { id } });
       return NextResponse.json({ success: true });
     }
@@ -196,14 +203,17 @@ export async function POST(request: Request) {
       const { name, routeType } = body;
       const exist = await prisma.busRoute.findUnique({ where: { name } });
       if (exist) return NextResponse.json({ error: '이미 존재하는 노선입니다.' }, { status: 400 });
-      const route = await prisma.busRoute.create({ data: { name, routeType: routeType || 'PUBLIC' } });
+      const route = await prisma.busRoute.create({
+        data: { name, routeType: routeType || 'PUBLIC' },
+      });
       return NextResponse.json(route);
     }
 
     if (action === 'UPDATE_ROUTE') {
       const { id, name, routeType, weekdayCount, satDrops, sunDrops, longShifts } = body;
       const exist = await prisma.busRoute.findFirst({ where: { name, id: { not: id } } });
-      if (exist) return NextResponse.json({ error: '이미 존재하는 노선 번호입니다.' }, { status: 400 });
+      if (exist)
+        return NextResponse.json({ error: '이미 존재하는 노선 번호입니다.' }, { status: 400 });
 
       const route = await prisma.busRoute.update({
         where: { id },
@@ -227,7 +237,11 @@ export async function POST(request: Request) {
 
     if (action === 'SYNC_HOLIDAYS') {
       const apiKey = process.env.PUBLIC_DATA_API_KEY;
-      if (!apiKey) return NextResponse.json({ error: '환경변수에 API 키가 설정되지 않았습니다.' }, { status: 500 });
+      if (!apiKey)
+        return NextResponse.json(
+          { error: '환경변수에 API 키가 설정되지 않았습니다.' },
+          { status: 500 }
+        );
 
       const currentYear = new Date().getFullYear();
       const upsertOperations: any[] = [];
@@ -260,7 +274,9 @@ export async function POST(request: Request) {
         await prisma.$transaction(upsertOperations);
       }
 
-      return NextResponse.json({ message: `총 ${upsertOperations.length}개의 공휴일이 DB에 동기화되었습니다.` });
+      return NextResponse.json({
+        message: `총 ${upsertOperations.length}개의 공휴일이 DB에 동기화되었습니다.`,
+      });
     }
 
     return NextResponse.json({ error: '알 수 없는 요청입니다.' }, { status: 400 });

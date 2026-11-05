@@ -2038,169 +2038,6 @@ export async function GET(request: Request) {
 }
 </file>
 
-<file path="app/api/roster/route.ts">
-// 파일 위치: app/api/roster/route.ts
-import { NextResponse } from 'next/server';
-import prisma from '@/app/lib/prisma';
-
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const route = searchParams.get('route');
-    const yearMonth = searchParams.get('yearMonth');
-    const year = searchParams.get('year');
-
-    const configRecord = await prisma.monthlyRoster.findUnique({
-      where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
-    });
-    const payConfig = (configRecord?.rosterData as any) || { publicRules: [], privateRules: [] };
-
-    const resolvePublicWageForYm = (ym: string, fallback: number) => {
-      const pubRules = payConfig?.publicRules || [];
-      if (pubRules.length === 0) return fallback;
-      const sorted = [...pubRules].sort((a: any, b: any) =>
-        a.startYearMonth.localeCompare(b.startYearMonth)
-      );
-      let matched = fallback;
-      for (const r of sorted) {
-        if (r.startYearMonth <= ym) matched = r.hourlyWage;
-      }
-      return matched;
-    };
-
-    // 연간 통계 탭용 일괄 조회
-    if (route && year && !yearMonth) {
-      const prevYearDec = `${Number(year) - 1}-12`;
-
-      const [rosters, routeInfo, allRoutes, holidaysList, setting] = await Promise.all([
-        prisma.monthlyRoster.findMany({
-          where: {
-            route,
-            OR: [{ yearMonth: { startsWith: `${year}-` } }, { yearMonth: prevYearDec }],
-          },
-          orderBy: { yearMonth: 'asc' },
-        }),
-        prisma.busRoute.findUnique({ where: { name: route } }),
-        prisma.busRoute.findMany({ select: { name: true, routeType: true }, orderBy: { name: 'asc' } }),
-        prisma.holiday.findMany({
-          where: { date: { startsWith: year } },
-          select: { date: true, name: true },
-        }),
-        prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
-      ]);
-
-      const holidayMap: Record<string, string> = {};
-      holidaysList.forEach(h => {
-        holidayMap[h.date] = h.name;
-      });
-      holidayMap[`${year}-05-01`] = '근로자의 날';
-      if (Number(year) >= 2026) {
-        holidayMap[`${year}-07-17`] = '제헌절';
-      }
-
-      return NextResponse.json(
-        {
-          rosters,
-          routeInfo,
-          allRoutes,
-          holidays: holidayMap,
-          defaultHourlyWage: setting?.baseHourlyWage || 16911,
-          payConfig,
-        },
-        { status: 200 }
-      );
-    }
-
-    if (!route || !yearMonth) {
-      return NextResponse.json({ error: 'route와 yearMonth 파라미터가 모두 필요합니다.' }, { status: 400 });
-    }
-
-    const [roster, routeInfo] = await Promise.all([
-      prisma.monthlyRoster.findUnique({
-        where: { route_yearMonth: { route, yearMonth } },
-      }),
-      prisma.busRoute.findUnique({
-        where: { name: route },
-      }),
-    ]);
-
-    if (roster) {
-      return NextResponse.json(
-        { rosterData: roster.rosterData, hourlyWage: roster.hourlyWage, routeInfo, payConfig },
-        { status: 200 }
-      );
-    } else {
-      const setting = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
-      const baseWage = setting?.baseHourlyWage || 16911;
-      const effectiveWage = resolvePublicWageForYm(yearMonth, baseWage);
-      return NextResponse.json(
-        { rosterData: [], hourlyWage: effectiveWage, routeInfo, payConfig },
-        { status: 200 }
-      );
-    }
-  } catch (error) {
-    console.error('배차표 조회 에러:', error);
-    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { action, route, yearMonth, rosterData, hourlyWage } = body;
-
-    if (!route || !yearMonth) {
-      return NextResponse.json({ error: '필수 데이터가 누락되었습니다.' }, { status: 400 });
-    }
-
-    if (action === 'IMPORT_PREVIOUS') {
-      const pastRoster = await prisma.monthlyRoster.findFirst({
-        where: { route, yearMonth: { lt: yearMonth } },
-        orderBy: { yearMonth: 'desc' },
-      });
-
-      if (!pastRoster || !pastRoster.rosterData || (pastRoster.rosterData as any[]).length === 0) {
-        return NextResponse.json({ error: '불러올 이전 배차 데이터가 없습니다.' }, { status: 404 });
-      }
-
-      const pastData = pastRoster.rosterData as any[];
-      // ✨ 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
-      const inheritedBaseData = pastData.map(group => ({
-        ...group,
-        drivers: group.drivers.map((driver: any) => ({
-          ...driver,
-          schedules: {},
-          baseSchedules: {},
-          defaultRestDays: Array.isArray(driver.defaultRestDays) ? driver.defaultRestDays : [],
-        })),
-      }));
-
-      const updatedRoster = await prisma.monthlyRoster.upsert({
-        where: { route_yearMonth: { route, yearMonth } },
-        update: { rosterData: inheritedBaseData, hourlyWage },
-        create: { route, yearMonth, rosterData: inheritedBaseData, hourlyWage },
-      });
-
-      return NextResponse.json(
-        { success: true, rosterData: updatedRoster.rosterData, hourlyWage: updatedRoster.hourlyWage },
-        { status: 200 }
-      );
-    }
-
-    const updatedRoster = await prisma.monthlyRoster.upsert({
-      where: { route_yearMonth: { route, yearMonth } },
-      update: { rosterData, hourlyWage },
-      create: { route, yearMonth, rosterData, hourlyWage },
-    });
-
-    return NextResponse.json({ success: true, rosterData: updatedRoster.rosterData }, { status: 200 });
-  } catch (error) {
-    console.error('배차표 저장 에러:', error);
-    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
-  }
-}
-</file>
-
 <file path="app/api/users/route.ts">
 // 파일 위치: app/api/users/route.ts
 import { NextResponse } from 'next/server';
@@ -2400,36 +2237,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-}
-</file>
-
-<file path="app/manifest.ts">
-// 파일 위치: app/manifest.ts
-import type { MetadataRoute } from 'next';
-
-export default function manifest(): MetadataRoute.Manifest {
-  return {
-    name: '배차메이커 - 버스 승무원 월간 근무 계획표',
-    short_name: '배차메이커',
-    description: '공공관리제 및 민영제 버스 노선 월간 배차·근무 통계 관리 시스템',
-    start_url: '/main',
-    display: 'standalone',
-    orientation: 'landscape',
-    background_color: '#f8fafc',
-    theme_color: '#1e3a8a',
-    icons: [
-      {
-        src: '/icon.jpg',
-        sizes: '512x512',
-        type: 'image/jpeg',
-      },
-      {
-        src: '/apple-icon.jpg',
-        sizes: '180x180',
-        type: 'image/jpeg',
-      },
-    ],
-  };
 }
 </file>
 
@@ -12260,6 +12067,190 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 }
 </file>
 
+<file path="app/api/roster/route.ts">
+// 파일 위치: app/api/roster/route.ts
+import { NextResponse } from 'next/server';
+import prisma from '@/app/lib/prisma';
+
+const resolvePublicWageForYm = (payConfig: any, ym: string, fallback: number) => {
+  const pubRules = payConfig?.publicRules || [];
+  if (pubRules.length === 0) return fallback;
+  const sorted = [...pubRules].sort((a: any, b: any) =>
+    a.startYearMonth.localeCompare(b.startYearMonth)
+  );
+  let matched = fallback;
+  for (const r of sorted) {
+    if (r.startYearMonth <= ym) matched = r.hourlyWage;
+  }
+  return matched;
+};
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const route = searchParams.get('route');
+    const yearMonth = searchParams.get('yearMonth');
+    const year = searchParams.get('year');
+
+    // 1. 연간 통계 탭용 일괄 조회 (단 1회 병렬 처리)
+    if (route && year && !yearMonth) {
+      const prevYearDec = `${Number(year) - 1}-12`;
+
+      const [configRecord, rosters, routeInfo, allRoutes, holidaysList, setting] =
+        await Promise.all([
+          prisma.monthlyRoster.findUnique({
+            where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+          }),
+          prisma.monthlyRoster.findMany({
+            where: {
+              route,
+              OR: [{ yearMonth: { startsWith: `${year}-` } }, { yearMonth: prevYearDec }],
+            },
+            orderBy: { yearMonth: 'asc' },
+          }),
+          prisma.busRoute.findUnique({ where: { name: route } }),
+          prisma.busRoute.findMany({
+            select: { name: true, routeType: true },
+            orderBy: { name: 'asc' },
+          }),
+          prisma.holiday.findMany({
+            where: { date: { startsWith: year } },
+            select: { date: true, name: true },
+          }),
+          prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } }),
+        ]);
+
+      const payConfig = (configRecord?.rosterData as any) || {
+        publicRules: [],
+        privateRules: [],
+      };
+
+      const holidayMap: Record<string, string> = {};
+      holidaysList.forEach(h => {
+        holidayMap[h.date] = h.name;
+      });
+      holidayMap[`${year}-05-01`] = '근로자의 날';
+      if (Number(year) >= 2026) {
+        holidayMap[`${year}-07-17`] = '제헌절';
+      }
+
+      return NextResponse.json(
+        {
+          rosters,
+          routeInfo,
+          allRoutes,
+          holidays: holidayMap,
+          defaultHourlyWage: setting?.baseHourlyWage || 16911,
+          payConfig,
+        },
+        { status: 200 }
+      );
+    }
+
+    if (!route || !yearMonth) {
+      return NextResponse.json(
+        { error: 'route와 yearMonth 파라미터가 모두 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 2. 월간 배차표 조회 (단 1회 병렬 처리)
+    const [configRecord, roster, routeInfo, setting] = await Promise.all([
+      prisma.monthlyRoster.findUnique({
+        where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
+      }),
+      prisma.monthlyRoster.findUnique({
+        where: { route_yearMonth: { route, yearMonth } },
+      }),
+      prisma.busRoute.findUnique({
+        where: { name: route },
+      }),
+      prisma.systemSetting.findUnique({
+        where: { id: 'GLOBAL' },
+      }),
+    ]);
+
+    const payConfig = (configRecord?.rosterData as any) || {
+      publicRules: [],
+      privateRules: [],
+    };
+
+    if (roster) {
+      return NextResponse.json(
+        { rosterData: roster.rosterData, hourlyWage: roster.hourlyWage, routeInfo, payConfig },
+        { status: 200 }
+      );
+    } else {
+      const baseWage = setting?.baseHourlyWage || 16911;
+      const effectiveWage = resolvePublicWageForYm(payConfig, yearMonth, baseWage);
+      return NextResponse.json(
+        { rosterData: [], hourlyWage: effectiveWage, routeInfo, payConfig },
+        { status: 200 }
+      );
+    }
+  } catch (error) {
+    console.error('배차표 조회 에러:', error);
+    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { action, route, yearMonth, rosterData, hourlyWage } = body;
+
+    if (!route || !yearMonth) {
+      return NextResponse.json({ error: '필수 데이터가 누락되었습니다.' }, { status: 400 });
+    }
+
+    if (action === 'IMPORT_PREVIOUS') {
+      const pastRoster = await prisma.monthlyRoster.findFirst({
+        where: { route, yearMonth: { lt: yearMonth } },
+        orderBy: { yearMonth: 'desc' },
+      });
+
+      if (!pastRoster || !pastRoster.rosterData || (pastRoster.rosterData as any[]).length === 0) {
+        return NextResponse.json({ error: '불러올 이전 배차 데이터가 없습니다.' }, { status: 404 });
+      }
+
+      const pastData = pastRoster.rosterData as any[];
+      // 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
+      const inheritedBaseData = pastData.map(group => ({
+        ...group,
+        drivers: group.drivers.map((driver: any) => ({
+          ...driver,
+          schedules: {},
+          baseSchedules: {},
+          defaultRestDays: Array.isArray(driver.defaultRestDays) ? driver.defaultRestDays : [],
+        })),
+      }));
+
+      const updatedRoster = await prisma.monthlyRoster.upsert({
+        where: { route_yearMonth: { route, yearMonth } },
+        update: { rosterData: inheritedBaseData, hourlyWage },
+        create: { route, yearMonth, rosterData: inheritedBaseData, hourlyWage },
+      });
+
+      return NextResponse.json(
+        { success: true, rosterData: updatedRoster.rosterData, hourlyWage: updatedRoster.hourlyWage },
+        { status: 200 }
+      );
+    }
+
+    const updatedRoster = await prisma.monthlyRoster.upsert({
+      where: { route_yearMonth: { route, yearMonth } },
+      update: { rosterData, hourlyWage },
+      create: { route, yearMonth, rosterData, hourlyWage },
+    });
+
+    return NextResponse.json({ success: true, rosterData: updatedRoster.rosterData }, { status: 200 });
+  } catch (error) {
+    console.error('배차표 저장 에러:', error);
+    return NextResponse.json({ error: '서버 오류' }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/layout.tsx">
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -12289,6 +12280,36 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
+}
+</file>
+
+<file path="app/manifest.ts">
+// 파일 위치: app/manifest.ts
+import type { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: '배차메이커 - 버스 승무원 월간 근무 계획표',
+    short_name: '배차메이커',
+    description: '공공관리제 및 민영제 버스 노선 월간 배차·근무 통계 관리 시스템',
+    start_url: '/',
+    display: 'standalone',
+    orientation: 'landscape',
+    background_color: '#f8fafc',
+    theme_color: '#1e3a8a',
+    icons: [
+      {
+        src: '/icon.jpg',
+        sizes: '512x512',
+        type: 'image/jpeg',
+      },
+      {
+        src: '/apple-icon.jpg',
+        sizes: '180x180',
+        type: 'image/jpeg',
+      },
+    ],
+  };
 }
 </file>
 
@@ -12460,6 +12481,53 @@ export default function LoginPage() {
 }
 </file>
 
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# 백업용 xml 파일이 Git 및 Repomix 백업에 중복 포함되지 않도록 제외
+*.xml
+</file>
+
 <file path="prisma/schema.prisma">
 // 파일 위치: prisma/schema.prisma
 generator client {
@@ -12467,8 +12535,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model SystemSetting {
@@ -12523,53 +12592,6 @@ model BusRoute {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
-</file>
-
-<file path=".gitignore">
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# 백업용 xml 파일이 Git 및 Repomix 백업에 중복 포함되지 않도록 제외
-*.xml
 </file>
 
 <file path="package.json">

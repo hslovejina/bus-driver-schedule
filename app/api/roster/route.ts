@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const yearMonth = searchParams.get('yearMonth');
     const year = searchParams.get('year');
 
-    // 1. 연간 통계 탭용 일괄 조회 (단 1회 병렬 처리)
+    // 연간 통계 탭용 일괄 조회 (단 1회 병렬 쿼리)
     if (route && year && !yearMonth) {
       const prevYearDec = `${Number(year) - 1}-12`;
 
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // 2. 월간 배차표 조회 (단 1회 병렬 처리)
+    // 월간 배차표 조회 (단 1회 병렬 쿼리)
     const [configRecord, roster, routeInfo, setting] = await Promise.all([
       prisma.monthlyRoster.findUnique({
         where: { route_yearMonth: { route: '__SYSTEM_CONFIG__', yearMonth: 'GLOBAL' } },
@@ -144,7 +144,6 @@ export async function POST(request: Request) {
       }
 
       const pastData = pastRoster.rosterData as any[];
-      // 차번, 성명, 개인별 기본휴무(defaultRestDays)는 그대로 승계하고 근무 일정만 초기화
       const inheritedBaseData = pastData.map(group => ({
         ...group,
         drivers: group.drivers.map((driver: any) => ({
