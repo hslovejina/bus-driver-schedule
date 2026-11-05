@@ -1,5 +1,5 @@
 // 파일 위치: hooks/useRosterData.ts
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { isNormalPrivateShift, setRuntimePayConfig, type DriverInfo } from '../utils/calculator';
 
 export type { DriverInfo };
@@ -25,7 +25,6 @@ function isActualPublicWork(work: string | undefined): boolean {
   return true;
 }
 
-// 구간(minOrder ~ maxOrder) 내에서 순번을 steps만큼 전진시키는 도우미 함수
 function advanceInZone(num: number, steps: number, minOrder: number, maxOrder: number): number {
   const zoneLen = maxOrder - minOrder + 1;
   if (zoneLen <= 0) return num;
@@ -33,7 +32,6 @@ function advanceInZone(num: number, steps: number, minOrder: number, maxOrder: n
   return minOrder + ((((clamped - minOrder + steps) % zoneLen) + zoneLen) % zoneLen);
 }
 
-// 스케줄 데이터를 분석해 가장 많이 쉰 연속 요일 2개(고정휴무)를 자동 추출하는 도우미 함수
 function inferDefaultRestDaysFromSchedules(
   schedules: Record<string, string> | undefined,
   targetYear: number,
@@ -78,7 +76,6 @@ function inferDefaultRestDaysFromSchedules(
   return [DOW_NAMES[pair[0]], DOW_NAMES[pair[1]]];
 }
 
-// 공공관리제: 실제 근무(schedules)를 최우선 반영하되 연차/휴무 등으로 빈 날은 초기세팅 원본(baseSchedules)으로 보완한 맵 생성
 function buildEffectiveScheduleMap(drv: DriverInfo | null | undefined): Record<string, string> {
   if (!drv) return {};
   const base = drv.baseSchedules || {};
@@ -93,7 +90,6 @@ function buildEffectiveScheduleMap(drv: DriverInfo | null | undefined): Record<s
   return merged;
 }
 
-// 민영제: 실제 근무(schedules)의 정규 순번을 우선 반영하고 휴무/대근/지원 등으로 비거나 변형된 날은 baseSchedules로 보완
 function buildPrivateEffectiveScheduleMap(
   drv: DriverInfo | null | undefined,
   allRoutes: { name: string; routeType: string }[],
@@ -119,7 +115,22 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('IDLE');
 
   const [isRosterLoading, setIsRosterLoading] = useState(true);
-  const [route, setRoute] = useState<string | null>(null);
+  // ✨ 첫 진입 Waterfall 제거: localStorage의 사용자 노선을 즉시 초기값으로 읽어 배차표 조회를 지연 없이 시작
+  const [route, setRoute] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const userStr = localStorage.getItem('currentUser');
+        if (userStr) {
+          const parsed = JSON.parse(userStr);
+          return parsed.route || '미지정';
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+    return null;
+  });
+
   const [hourlyWage, setHourlyWage] = useState<number>(16911);
   const [routeInfo, setRouteInfo] = useState<any>(null);
   const [allRoutes, setAllRoutes] = useState<{ name: string; routeType: string }[]>([]);
@@ -128,6 +139,16 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
   const [nextMonthRoster, setNextMonthRoster] = useState<BusGroup[]>([]);
 
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
+
+  // 디바운스 자동저장 및 네트워크 경쟁 상태(Race Condition) 방지용 Ref
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
+  const pendingSavePayloadRef = useRef<{
+    route: string;
+    yearMonth: string;
+    rosterData: BusGroup[];
+    hourlyWage: number;
+  } | null>(null);
 
   const getShiftForDate = useCallback(
     (
@@ -152,30 +173,18 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     []
   );
 
+  // 백그라운드에서 사용자 최신 노선 변경 여부만 가볍게 동기화
   useEffect(() => {
-    const fetchRouteAndAllRoutes = async () => {
-      try {
-        const routesRes = await fetch('/api/admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'GET_ROUTES' }),
-        });
-        if (routesRes.ok) {
-          const routesData = await routesRes.json();
-          if (Array.isArray(routesData)) {
-            setAllRoutes(routesData);
-          }
-        }
-      } catch (e) {
-        console.error('전체 노선 목록 로딩 실패:', e);
-      }
-
+    const syncLatestUserRoute = async () => {
       const userStr = localStorage.getItem('currentUser');
       if (!userStr) {
         setRoute('미지정');
         return;
       }
       const localUser = JSON.parse(userStr);
+      if (!route) {
+        setRoute(localUser.route || '미지정');
+      }
 
       try {
         const res = await fetch('/api/users', {
@@ -187,19 +196,21 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
 
         if (data.success && data.user) {
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          setRoute(data.user.route || '미지정');
-        } else {
-          setRoute(localUser.route || '미지정');
+          const latestRoute = data.user.route || '미지정';
+          setRoute(prev => (prev !== latestRoute ? latestRoute : prev));
         }
       } catch {
-        setRoute(localUser.route || '미지정');
+        // 오프라인 또는 일시 오류 시 로컬 정보 유지
       }
     };
-    fetchRouteAndAllRoutes();
+    syncLatestUserRoute();
   }, []);
 
+  // ✨ 단일 통합 API 호출(includeAdjacent=true)로 당월·전월·익월 배차표 + 노선 목록 + 급여 설정을 한 번에 로드
   useEffect(() => {
     if (!route) return;
+
+    const controller = new AbortController();
 
     const fetchRoster = async () => {
       setIsRosterLoading(true);
@@ -207,68 +218,112 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       setFutureHistory([]);
       setSaveStatus('IDLE');
       try {
-        const prevDate = new Date(year, month - 2, 1);
-        const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        const res = await fetch(
+          `/api/roster?route=${encodeURIComponent(route)}&yearMonth=${yearMonth}&includeAdjacent=true`,
+          { signal: controller.signal }
+        );
 
-        const nextDate = new Date(year, month, 1);
-        const nextYearMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
-
-        const [res, prevRes, nextRes] = await Promise.all([
-          fetch(`/api/roster?route=${encodeURIComponent(route)}&yearMonth=${yearMonth}`),
-          fetch(`/api/roster?route=${encodeURIComponent(route)}&yearMonth=${prevYearMonth}`),
-          fetch(`/api/roster?route=${encodeURIComponent(route)}&yearMonth=${nextYearMonth}`),
-        ]);
-
-        const [data, prevData, nextDataObj] = await Promise.all([
-          res.ok ? res.json() : null,
-          prevRes.ok ? prevRes.json() : null,
-          nextRes.ok ? nextRes.json() : null,
-        ]);
-
-        if (data) {
+        if (res.ok) {
+          const data = await res.json();
           setRosterData(data.rosterData || []);
+          setPrevMonthRoster(data.prevRosterData || []);
+          setNextMonthRoster(data.nextRosterData || []);
           setHourlyWage(data.hourlyWage || 16911);
           setRouteInfo(data.routeInfo || null);
-
-          // ✨ 서버에서 받아온 페이 조견표 설정을 계산기에 등록합니다.
+          if (Array.isArray(data.allRoutes)) {
+            setAllRoutes(data.allRoutes);
+          }
           if (data.payConfig) {
             setRuntimePayConfig(data.payConfig);
           }
         }
-        if (prevData) {
-          setPrevMonthRoster(prevData.rosterData || []);
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') {
+          console.error('배차표 로딩 실패:', error);
         }
-        if (nextDataObj) {
-          setNextMonthRoster(nextDataObj.rosterData || []);
-        }
-      } catch (error) {
-        console.error('배차표 로딩 실패:', error);
       } finally {
-        setIsRosterLoading(false);
+        if (!controller.signal.aborted) {
+          setIsRosterLoading(false);
+        }
       }
     };
-    fetchRoster();
-  }, [yearMonth, route, year, month]);
 
+    fetchRoster();
+
+    return () => {
+      controller.abort();
+    };
+  }, [yearMonth, route]);
+
+  // 대기 중인 저장이 있을 때 즉시 전송하는 플러시 함수 (월 변경 또는 언마운트 시 데이터 유실 방지)
+  const flushPendingSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const payload = pendingSavePayloadRef.current;
+    if (!payload) return;
+    pendingSavePayloadRef.current = null;
+
+    fetch('/api/roster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SAVE', ...payload }),
+      keepalive: true,
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      flushPendingSave();
+    };
+  }, [flushPendingSave, yearMonth, route]);
+
+  // ✨ 250ms 디바운스 + AbortController로 연속 수정 시 서버 부하 및 응답 역전 현상 완벽 방지
   const saveToServer = useCallback(
-    async (newData: BusGroup[]) => {
+    (newData: BusGroup[]) => {
       if (!route) return;
       setSaveStatus('SAVING');
-      try {
-        const res = await fetch('/api/roster', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'SAVE', route, yearMonth, rosterData: newData, hourlyWage }),
-        });
-        if (res.ok) {
-          setSaveStatus('SAVED');
-        } else {
-          setSaveStatus('ERROR');
-        }
-      } catch (error) {
-        console.error('배차표 저장 실패:', error);
-        setSaveStatus('ERROR');
+
+      pendingSavePayloadRef.current = {
+        route,
+        yearMonth,
+        rosterData: newData,
+        hourlyWage,
+      };
+
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
       }
+
+      saveTimerRef.current = setTimeout(async () => {
+        const payload = pendingSavePayloadRef.current;
+        if (!payload) return;
+        pendingSavePayloadRef.current = null;
+
+        if (saveAbortRef.current) {
+          saveAbortRef.current.abort();
+        }
+        const controller = new AbortController();
+        saveAbortRef.current = controller;
+
+        try {
+          const res = await fetch('/api/roster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SAVE', ...payload }),
+            signal: controller.signal,
+          });
+          if (!controller.signal.aborted) {
+            setSaveStatus(res.ok ? 'SAVED' : 'ERROR');
+          }
+        } catch (error: any) {
+          if (error?.name !== 'AbortError') {
+            console.error('배차표 저장 실패:', error);
+            setSaveStatus('ERROR');
+          }
+        }
+      }, 250);
     },
     [route, yearMonth, hourlyWage]
   );
@@ -348,113 +403,140 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     return stats;
   }, [rosterData, daysArray, routeInfo, maxDriverOrder, allRoutes]);
 
-  const addBusGroup = (type: 'BUS' | 'SP', busNo: string) => {
-    const trimmedBusNo = busNo.trim();
-    if (type === 'BUS') {
-      const isDuplicate = rosterData.some(group => group.busNo === trimmedBusNo);
-      if (isDuplicate) return { success: false, duplicate: true };
-    }
+  const addBusGroup = useCallback(
+    (type: 'BUS' | 'SP', busNo: string) => {
+      const trimmedBusNo = busNo.trim();
+      if (type === 'BUS') {
+        const isDuplicate = rosterData.some(group => group.busNo === trimmedBusNo);
+        if (isDuplicate) return { success: false, duplicate: true };
+      }
 
-    const isPrivate = routeInfo?.routeType === 'PRIVATE';
-
-    const newEntry: BusGroup = {
-      busNo: type === 'SP' ? 'SP' : trimmedBusNo,
-      drivers:
-        type === 'SP'
-          ? [{ name: '새 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] }]
-          : isPrivate
-          ? [
-              { name: 'A조 기사', schedules: {}, baseSchedules: {} },
-              { name: 'B조 기사', schedules: {}, baseSchedules: {} },
-            ]
-          : [
-              { name: '오전 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] },
-              { name: '오후 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] },
-            ],
-    };
-
-    updateDataAndSave([...rosterData, newEntry]);
-    return { success: true };
-  };
-
-  const moveRowUp = (index: number) => {
-    if (index === 0) return;
-    const newData = cloneRoster(rosterData);
-    [newData[index - 1], newData[index]] = [newData[index], newData[index - 1]];
-    updateDataAndSave(newData);
-  };
-
-  const moveRowDown = (index: number) => {
-    if (index === rosterData.length - 1) return;
-    const newData = cloneRoster(rosterData);
-    [newData[index], newData[index + 1]] = [newData[index + 1], newData[index]];
-    updateDataAndSave(newData);
-  };
-
-  const deleteRow = (index: number) => {
-    const newData = rosterData.filter((_, i) => i !== index);
-    updateDataAndSave(newData);
-  };
-
-  const updateDriverName = (bIdx: number, dIdx: number, newName: string) => {
-    const newData = cloneRoster(rosterData);
-    const newDrivers = [...newData[bIdx].drivers];
-    const trimmedName = newName.trim();
-
-    if (!trimmedName) {
-      newDrivers[dIdx] = { ...newDrivers[dIdx], name: '' };
-    } else {
-      const newSchedules = { ...newDrivers[dIdx].schedules };
       const isPrivate = routeInfo?.routeType === 'PRIVATE';
-      const maxShift = routeInfo?.weekdayCount || maxDriverOrder || 50;
 
-      if (isPrivate && Object.keys(newSchedules).length === 0) {
-        let anchorRef: any = null;
+      const newEntry: BusGroup = {
+        busNo: type === 'SP' ? 'SP' : trimmedBusNo,
+        drivers:
+          type === 'SP'
+            ? [{ name: '새 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] }]
+            : isPrivate
+            ? [
+                { name: 'A조 기사', schedules: {}, baseSchedules: {} },
+                { name: 'B조 기사', schedules: {}, baseSchedules: {} },
+              ]
+            : [
+                { name: '오전 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] },
+                { name: '오후 기사', schedules: {}, baseSchedules: {}, defaultRestDays: [] },
+              ],
+      };
 
-        for (let day = 1; day <= daysArray.length; day++) {
-          for (let b = 0; b < rosterData.length; b++) {
-            for (let d = 0; d < rosterData[b].drivers.length; d++) {
-              if (rosterData[b].drivers[d].name.trim() !== '') {
-                const work = rosterData[b].drivers[d].schedules[String(day)];
-                if (work && isNormalPrivateShift(work, allRoutes, maxShift)) {
-                  anchorRef = {
-                    bIdx: b,
-                    dIdx: d,
-                    shift: parseInt(work, 10),
-                    dateObj: new Date(year, month - 1, day),
-                  };
-                  break;
+      updateDataAndSave([...rosterData, newEntry]);
+      return { success: true };
+    },
+    [rosterData, routeInfo?.routeType, updateDataAndSave]
+  );
+
+  // ✨ useCallback 적용으로 RosterTableRow의 React.memo가 깨지지 않도록 보장
+  const moveRowUp = useCallback(
+    (index: number) => {
+      if (index === 0) return;
+      const newData = cloneRoster(rosterData);
+      [newData[index - 1], newData[index]] = [newData[index], newData[index - 1]];
+      updateDataAndSave(newData);
+    },
+    [rosterData, updateDataAndSave]
+  );
+
+  const moveRowDown = useCallback(
+    (index: number) => {
+      if (index === rosterData.length - 1) return;
+      const newData = cloneRoster(rosterData);
+      [newData[index], newData[index + 1]] = [newData[index + 1], newData[index]];
+      updateDataAndSave(newData);
+    },
+    [rosterData, updateDataAndSave]
+  );
+
+  const deleteRow = useCallback(
+    (index: number) => {
+      const newData = rosterData.filter((_, i) => i !== index);
+      updateDataAndSave(newData);
+    },
+    [rosterData, updateDataAndSave]
+  );
+
+  const updateDriverName = useCallback(
+    (bIdx: number, dIdx: number, newName: string) => {
+      const newData = cloneRoster(rosterData);
+      const newDrivers = [...newData[bIdx].drivers];
+      const trimmedName = newName.trim();
+
+      if (!trimmedName) {
+        newDrivers[dIdx] = { ...newDrivers[dIdx], name: '' };
+      } else {
+        const newSchedules = { ...newDrivers[dIdx].schedules };
+        const isPrivate = routeInfo?.routeType === 'PRIVATE';
+        const maxShift = routeInfo?.weekdayCount || maxDriverOrder || 50;
+
+        if (isPrivate && Object.keys(newSchedules).length === 0) {
+          let anchorRef: any = null;
+
+          for (let day = 1; day <= daysArray.length; day++) {
+            for (let b = 0; b < rosterData.length; b++) {
+              for (let d = 0; d < rosterData[b].drivers.length; d++) {
+                if (rosterData[b].drivers[d].name.trim() !== '') {
+                  const work = rosterData[b].drivers[d].schedules[String(day)];
+                  if (work && isNormalPrivateShift(work, allRoutes, maxShift)) {
+                    anchorRef = {
+                      bIdx: b,
+                      dIdx: d,
+                      shift: parseInt(work, 10),
+                      dateObj: new Date(year, month - 1, day),
+                    };
+                    break;
+                  }
                 }
               }
+              if (anchorRef) break;
             }
             if (anchorRef) break;
           }
-          if (anchorRef) break;
-        }
 
-        if (anchorRef) {
-          const totalBuses = routeInfo?.weekdayCount || rosterData.length || 1;
-          daysArray.forEach(d => {
-            const targetDateObj = new Date(year, month - 1, d);
-            const shift = getShiftForDate(targetDateObj, bIdx, dIdx, anchorRef, totalBuses);
-            if (shift !== null) {
-              newSchedules[String(d)] = String(shift);
-            }
-          });
+          if (anchorRef) {
+            const totalBuses = routeInfo?.weekdayCount || rosterData.length || 1;
+            daysArray.forEach(d => {
+              const targetDateObj = new Date(year, month - 1, d);
+              const shift = getShiftForDate(targetDateObj, bIdx, dIdx, anchorRef, totalBuses);
+              if (shift !== null) {
+                newSchedules[String(d)] = String(shift);
+              }
+            });
+          }
         }
+        newDrivers[dIdx] = {
+          ...newDrivers[dIdx],
+          name: trimmedName,
+          schedules: newSchedules,
+          baseSchedules: { ...(newDrivers[dIdx].baseSchedules || newSchedules) },
+        };
       }
-      newDrivers[dIdx] = {
-        ...newDrivers[dIdx],
-        name: trimmedName,
-        schedules: newSchedules,
-        baseSchedules: { ...(newDrivers[dIdx].baseSchedules || newSchedules) },
-      };
-    }
 
-    newData[bIdx] = { ...newData[bIdx], drivers: newDrivers };
-    updateDataAndSave(newData);
-    return true;
-  };
+      newData[bIdx] = { ...newData[bIdx], drivers: newDrivers };
+      updateDataAndSave(newData);
+      return true;
+    },
+    [
+      rosterData,
+      routeInfo?.routeType,
+      routeInfo?.weekdayCount,
+      maxDriverOrder,
+      daysArray,
+      allRoutes,
+      year,
+      month,
+      getShiftForDate,
+      updateDataAndSave,
+    ]
+  );
 
   const clearDriverSchedules = useCallback(
     (bIdx: number, dIdx: number) => {
@@ -497,7 +579,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     [rosterData, updateDataAndSave]
   );
 
-  // 기본휴무가 '미지정(-)'인 기사만 안전하게 자동 추출 (이미 지정/수정된 기본휴무는 절대 변경하지 않음)
   const autoExtractAllDefaultRestDays = useCallback(() => {
     if (rosterData.length === 0) return 0;
     const newData = cloneRoster(rosterData);
@@ -576,135 +657,162 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     return updatedCount;
   }, [rosterData, prevMonthRoster, year, month, updateDataAndSave]);
 
-  const updateBusNo = (bIdx: number, newBusNo: string) => {
-    const trimmedVal = newBusNo.trim();
-    if (!trimmedVal) return { success: false, empty: true };
+  const updateBusNo = useCallback(
+    (bIdx: number, newBusNo: string) => {
+      const trimmedVal = newBusNo.trim();
+      if (!trimmedVal) return { success: false, empty: true };
 
-    const isDuplicate = rosterData.some((group, idx) => idx !== bIdx && group.busNo === trimmedVal);
-    if (isDuplicate) return { success: false, duplicate: true };
+      const isDuplicate = rosterData.some((group, idx) => idx !== bIdx && group.busNo === trimmedVal);
+      if (isDuplicate) return { success: false, duplicate: true };
 
-    const newData = cloneRoster(rosterData);
-    newData[bIdx] = { ...newData[bIdx], busNo: trimmedVal };
-    updateDataAndSave(newData);
-    return { success: true };
-  };
-
-  const applySchedule = (
-    bIdx: number,
-    dIdx: number,
-    day: number,
-    workText: string | null,
-    isCustom: boolean = false,
-    dayType: string = 'WEEKDAY'
-  ) => {
-    const isPrivate = routeInfo?.routeType === 'PRIVATE';
-    const totalBuses = routeInfo?.weekdayCount || rosterData.length || 1;
-    const isShiftNumber =
-      !isCustom && workText !== null && isNormalPrivateShift(workText, allRoutes, totalBuses);
-
-    let isEmpty = true;
-    for (const group of rosterData) {
-      for (const driver of group.drivers) {
-        if (Object.keys(driver.schedules).length > 0) {
-          isEmpty = false;
-          break;
-        }
-      }
-      if (!isEmpty) break;
-    }
-
-    if (isPrivate && isEmpty && isShiftNumber && workText !== null) {
-      const anchorRef = {
-        bIdx,
-        dIdx,
-        shift: parseInt(workText, 10),
-        dateObj: new Date(year, month - 1, day),
-      };
-
-      const newData = rosterData.map((group, currentBIdx) => {
-        const newDrivers = group.drivers.map((driver, currentDIdx) => {
-          if (!driver.name.trim()) return { ...driver, schedules: {}, baseSchedules: {} };
-
-          const newSchedules: Record<string, string> = {};
-          daysArray.forEach(d => {
-            const targetDateObj = new Date(year, month - 1, d);
-            const shift = getShiftForDate(targetDateObj, currentBIdx, currentDIdx, anchorRef, totalBuses);
-            if (shift !== null) {
-              newSchedules[String(d)] = String(shift);
-            }
-          });
-
-          return { ...driver, schedules: newSchedules, baseSchedules: { ...newSchedules } };
-        });
-        return { ...group, drivers: newDrivers };
-      });
-
+      const newData = cloneRoster(rosterData);
+      newData[bIdx] = { ...newData[bIdx], busNo: trimmedVal };
       updateDataAndSave(newData);
-      return;
-    }
+      return { success: true };
+    },
+    [rosterData, updateDataAndSave]
+  );
 
-    const newData = cloneRoster(rosterData);
-    const newDrivers = [...newData[bIdx].drivers];
-    const newSchedules = { ...newDrivers[dIdx].schedules };
+  const applySchedule = useCallback(
+    (
+      bIdx: number,
+      dIdx: number,
+      day: number,
+      workText: string | null,
+      isCustom: boolean = false,
+      dayType: string = 'WEEKDAY'
+    ) => {
+      const isPrivate = routeInfo?.routeType === 'PRIVATE';
+      const totalBuses = routeInfo?.weekdayCount || rosterData.length || 1;
+      const isShiftNumber =
+        !isCustom && workText !== null && isNormalPrivateShift(workText, allRoutes, totalBuses);
 
-    if (workText === null) {
-      delete newSchedules[String(day)];
-    } else {
-      newSchedules[String(day)] = workText;
-    }
-
-    newDrivers[dIdx] = { ...newDrivers[dIdx], schedules: newSchedules };
-
-    const isSpBus = newData[bIdx].busNo.trim().toUpperCase() === 'SP';
-    if (!isPrivate && !isSpBus && newDrivers.length >= 2 && workText && !isCustom) {
-      const match = workText.trim().match(/^(전|후)(\d+)$/);
-      if (match) {
-        const prefix = match[1];
-        const shiftNum = parseInt(match[2], 10);
-        const oppositePrefix = prefix === '전' ? '후' : '전';
-        const oppositeWork = `${oppositePrefix}${shiftNum}`;
-        const otherDIdx = dIdx === 0 ? 1 : 0;
-
-        const otherDriver = newDrivers[otherDIdx];
-        const otherCurrentWork = otherDriver?.schedules?.[String(day)];
-
-        if (otherDriver && otherDriver.name.trim() !== '' && (!otherCurrentWork || otherCurrentWork.trim() === '')) {
-          let drops: number[] = [];
-          if (dayType === 'SAT') drops = routeInfo?.satDrops || [];
-          else if (dayType === 'SUN' || dayType === 'JEOLNAL') drops = routeInfo?.sunDrops || [];
-          const isDropped = drops.includes(shiftNum);
-
-          let isTaken = false;
-          for (let gIdx = 0; gIdx < newData.length; gIdx++) {
-            const groupDrivers = gIdx === bIdx ? newDrivers : newData[gIdx].drivers;
-            for (let drvIdx = 0; drvIdx < groupDrivers.length; drvIdx++) {
-              if (gIdx === bIdx && (drvIdx === dIdx || drvIdx === otherDIdx)) continue;
-              if (groupDrivers[drvIdx].schedules[String(day)] === oppositeWork) {
-                isTaken = true;
-                break;
-              }
-            }
-            if (isTaken) break;
+      let isEmpty = true;
+      for (const group of rosterData) {
+        for (const driver of group.drivers) {
+          if (Object.keys(driver.schedules).length > 0) {
+            isEmpty = false;
+            break;
           }
+        }
+        if (!isEmpty) break;
+      }
 
-          if (!isDropped && !isTaken) {
-            newDrivers[otherDIdx] = {
-              ...otherDriver,
-              schedules: {
-                ...otherDriver.schedules,
-                [String(day)]: oppositeWork,
-              },
-            };
+      if (isPrivate && isEmpty && isShiftNumber && workText !== null) {
+        const anchorRef = {
+          bIdx,
+          dIdx,
+          shift: parseInt(workText, 10),
+          dateObj: new Date(year, month - 1, day),
+        };
+
+        const newData = rosterData.map((group, currentBIdx) => {
+          const newDrivers = group.drivers.map((driver, currentDIdx) => {
+            if (!driver.name.trim()) return { ...driver, schedules: {}, baseSchedules: {} };
+
+            const newSchedules: Record<string, string> = {};
+            daysArray.forEach(d => {
+              const targetDateObj = new Date(year, month - 1, d);
+              const shift = getShiftForDate(
+                targetDateObj,
+                currentBIdx,
+                currentDIdx,
+                anchorRef,
+                totalBuses
+              );
+              if (shift !== null) {
+                newSchedules[String(d)] = String(shift);
+              }
+            });
+
+            return { ...driver, schedules: newSchedules, baseSchedules: { ...newSchedules } };
+          });
+          return { ...group, drivers: newDrivers };
+        });
+
+        updateDataAndSave(newData);
+        return;
+      }
+
+      const newData = cloneRoster(rosterData);
+      const newDrivers = [...newData[bIdx].drivers];
+      const newSchedules = { ...newDrivers[dIdx].schedules };
+
+      if (workText === null) {
+        delete newSchedules[String(day)];
+      } else {
+        newSchedules[String(day)] = workText;
+      }
+
+      newDrivers[dIdx] = { ...newDrivers[dIdx], schedules: newSchedules };
+
+      const isSpBus = newData[bIdx].busNo.trim().toUpperCase() === 'SP';
+      if (!isPrivate && !isSpBus && newDrivers.length >= 2 && workText && !isCustom) {
+        const match = workText.trim().match(/^(전|후)(\d+)$/);
+        if (match) {
+          const prefix = match[1];
+          const shiftNum = parseInt(match[2], 10);
+          const oppositePrefix = prefix === '전' ? '후' : '전';
+          const oppositeWork = `${oppositePrefix}${shiftNum}`;
+          const otherDIdx = dIdx === 0 ? 1 : 0;
+
+          const otherDriver = newDrivers[otherDIdx];
+          const otherCurrentWork = otherDriver?.schedules?.[String(day)];
+
+          if (
+            otherDriver &&
+            otherDriver.name.trim() !== '' &&
+            (!otherCurrentWork || otherCurrentWork.trim() === '')
+          ) {
+            let drops: number[] = [];
+            if (dayType === 'SAT') drops = routeInfo?.satDrops || [];
+            else if (dayType === 'SUN' || dayType === 'JEOLNAL') drops = routeInfo?.sunDrops || [];
+            const isDropped = drops.includes(shiftNum);
+
+            let isTaken = false;
+            for (let gIdx = 0; gIdx < newData.length; gIdx++) {
+              const groupDrivers = gIdx === bIdx ? newDrivers : newData[gIdx].drivers;
+              for (let drvIdx = 0; drvIdx < groupDrivers.length; drvIdx++) {
+                if (gIdx === bIdx && (drvIdx === dIdx || drvIdx === otherDIdx)) continue;
+                if (groupDrivers[drvIdx].schedules[String(day)] === oppositeWork) {
+                  isTaken = true;
+                  break;
+                }
+              }
+              if (isTaken) break;
+            }
+
+            if (!isDropped && !isTaken) {
+              newDrivers[otherDIdx] = {
+                ...otherDriver,
+                schedules: {
+                  ...otherDriver.schedules,
+                  [String(day)]: oppositeWork,
+                },
+              };
+            }
           }
         }
       }
-    }
 
-    newData[bIdx] = { ...newData[bIdx], drivers: newDrivers };
-    updateDataAndSave(newData);
-  };
+      newData[bIdx] = { ...newData[bIdx], drivers: newDrivers };
+      updateDataAndSave(newData);
+    },
+    [
+      routeInfo?.routeType,
+      routeInfo?.weekdayCount,
+      routeInfo?.satDrops,
+      routeInfo?.sunDrops,
+      rosterData,
+      allRoutes,
+      year,
+      month,
+      daysArray,
+      getShiftForDate,
+      updateDataAndSave,
+    ]
+  );
 
-  // 민영제 전용: 빈 달력 명단 자동 호출 + 이전 달 순번에 이어 한 달 치 근무 자동 생성
   const runPrivateInitialSetup = useCallback(() => {
     const prevDate = new Date(year, month - 2, 1);
     const prevY = prevDate.getFullYear();
@@ -826,7 +934,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     updateDataAndSave,
   ]);
 
-  // ✨ 공공관리제 전용: 매일 순번 순환(휴무일 포함) + 기본휴무 날 빈칸 및 교대(전/후) 전환
   const runPublicInitialSetup = useCallback(() => {
     const prevDate = new Date(year, month - 2, 1);
     const prevY = prevDate.getFullYear();
@@ -865,7 +972,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       return prevMonthRoster[bIdx]?.drivers?.[dIdx] || null;
     };
 
-    // 1단계: 기본휴무 미지정 기사가 있을 때만 보완 후 기존 스케줄 초기화 (이미 지정된 기본휴무는 100% 보존)
     newData.forEach((group, bIdx) => {
       group.drivers.forEach((drv, dIdx) => {
         if (drv.name?.trim() && (!drv.defaultRestDays || drv.defaultRestDays.length < 2)) {
@@ -909,7 +1015,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       }
     });
 
-    // 2단계: 고정차번 구간(SP 이전 그룹: 1~9번 / SP 이후 그룹: 10~15번 등) 분리
     interface FixedZone {
       groupIndices: number[];
       minOrder: number;
@@ -938,7 +1043,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     const totalFixedBuses = orderCounter - 1;
     const totalShiftsCount = routeInfo?.weekdayCount || totalFixedBuses || 1;
 
-    // 3단계: 고정차번 차량별 '매일 +1 순환 순번' 및 '기본휴무 경계 교대 전환' 배정
     zones.forEach(zone => {
       const { minOrder, maxOrder } = zone;
 
@@ -952,7 +1056,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
         const map0 = buildEffectiveScheduleMap(prevDrv0);
         const map1 = buildEffectiveScheduleMap(prevDrv1);
 
-        // 현월 기본휴무 요일 셋
         const currRestDays =
           group.drivers[0]?.defaultRestDays?.length === 2
             ? group.drivers[0].defaultRestDays
@@ -960,8 +1063,7 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
             ? group.drivers[1].defaultRestDays
             : [];
         const currRestSet = new Set(currRestDays);
-        
-        // 전월 기본휴무 요일 셋 파악 (1순위: 전월에 저장된 기본휴무, 2순위: 전월 스케줄에서 추론)
+
         let prevRestDays: string[] = [];
         if (prevDrv0?.defaultRestDays && prevDrv0.defaultRestDays.length === 2) {
           prevRestDays = prevDrv0.defaultRestDays;
@@ -992,13 +1094,10 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
         }
         const prevRestSet = new Set(prevRestDays);
 
-        // A. [순번 복원] 순번은 휴무일·주말과 무관하게 매일 +1씩 순환하므로,
-        // 전월 정규 근무일(d)의 순번을 현월 1일(prevDaysCount - d + 1일 뒤)로 투영해 다수결로 현월 1일 시작 순번 산출!
         const day1ShiftVotes: Record<number, number> = {};
         for (let d = 1; d <= prevDaysCount; d++) {
           const dow = DOW_NAMES[new Date(prevY, prevM - 1, d).getDay()];
           const isRestDay = prevRestSet.has(dow);
-          // 정규 근무일에 높은 가중치 부여 (월 후반부 가중치 추가)
           const weight = (isRestDay ? 1 : 4) * (d > 15 ? 2 : 1);
           const stepsToCurrDay1 = prevDaysCount - d + 1;
 
@@ -1030,7 +1129,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
           }
         });
 
-        // B. [교대(전/후) 복원] 전월 기본휴무를 제외한 정규 근무 블록들에서 마지막 블록의 교대 형태 파악
         const prevBlocks: number[][] = [];
         let tempBlock: number[] = [];
         for (let d = 1; d <= prevDaysCount; d++) {
@@ -1091,7 +1189,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
         const isPrevLastDayRest = prevRestSet.has(prevLastDayDow);
         const isCurrFirstDayRest = currRestSet.has(currFirstDayDow);
 
-        // 전월 말일과 현월 1일 사이에 기본휴무가 없으면 전월 마지막 주간과 동일 교대 유지, 기본휴무가 있으면 교대 전환!
         let currFirstBlockDrv0Prefix: '전' | '후';
         if (!lastPrevPrefix) {
           currFirstBlockDrv0Prefix = '전';
@@ -1101,19 +1198,16 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
           currFirstBlockDrv0Prefix = lastPrevPrefix === '전' ? '후' : '전';
         }
 
-        // C. 현월 1일 ~ 말일까지 번호는 매일 +1 순환하고, 기본휴무 날짜만 빈칸 처리 & 휴무 후 교대(전/후) 전환!
         let blockIndex = -1;
         let inWorkBlock = false;
         const dayShiftNumMap: Record<number, number> = {};
         const dayDrv0PrefixMap: Record<number, '전' | '후'> = {};
 
         daysArray.forEach(day => {
-          // 순번은 휴무일·주말과 무관하게 매일 차례대로 +1 순환
           const shiftNum = advanceInZone(day1ShiftNum, day - 1, minOrder, maxOrder);
           const dow = DOW_NAMES[new Date(year, month - 1, day).getDay()];
 
           if (currRestSet.has(dow)) {
-            // 기본휴무 날짜는 빈칸 처리하고 다음 근무 블록에서 교대가 바뀌도록 플래그 해제
             inWorkBlock = false;
             return;
           }
@@ -1134,7 +1228,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
           dayDrv0PrefixMap[day] = drv0Prefix;
         });
 
-        // D. 각 기사별 스케줄 입력 + [전월 말일 오후➔현월 1일 오전 빈칸 처리] & [7일 연속 근로 빈칸 처리]
         group.drivers.forEach((driver, dIdx) => {
           if (!driver.name || !driver.name.trim()) return;
 
@@ -1151,15 +1244,12 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
               dIdx === 0 ? drv0Prefix : drv0Prefix === '전' ? '후' : '전';
             const assignedShift = `${myPrefix}${shiftNum}`;
 
-            // 기본 배차 원본(baseSchedules)에는 원래 순번 기록 보존
             driver.baseSchedules![String(day)] = assignedShift;
 
-            // 예외 1: 전월 마지막 날 실제 근무가 오후('후')인 상태에서 현월 1일 초기세팅이 오전('전')으로 시작하면 첫날 빈칸 처리
             if (day === 1 && prevLastDayActualWork.includes('후') && myPrefix === '전') {
               return;
             }
 
-            // 예외 2: 전월 마지막 주·말일 실제 근무와 이어져 7일 연속 근로에 해당하면 빈칸 처리
             let consecutivePriorDays = 0;
             for (let step = 1; step <= 6; step++) {
               const targetD = day - step;
@@ -1186,7 +1276,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       });
     });
 
-    // 4단계: 날짜별 고정차번 배정 후 남은 순번(전/후) 집계
     const remainingAmByDay: Record<number, string[]> = {};
     const remainingPmByDay: Record<number, string[]> = {};
 
@@ -1212,7 +1301,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       remainingPmByDay[day] = pmList;
     });
 
-    // 5단계: SP 기사들 기본휴무 경계 기준 교대 연속성 반영 + 남은 순번 배정 + 7일 연속/역교대 빈칸 처리
     let spIndex = 0;
     newData.forEach((group, bIdx) => {
       if (group.busNo.trim().toUpperCase() !== 'SP') return;
@@ -1244,7 +1332,6 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
         const prevSpMap = buildEffectiveScheduleMap(prevSp);
         const prevSpActual = prevSp?.schedules || {};
 
-        // 전월 SP 기사의 기본휴무 파악 (1순위: 전월에 저장된 기본휴무, 2순위: 전월 스케줄 추론, 3순위: 현월 기본휴무)
         let prevSpRestDays: string[] = [];
         if (prevSp?.defaultRestDays && prevSp.defaultRestDays.length === 2) {
           prevSpRestDays = prevSp.defaultRestDays;
@@ -1422,7 +1509,7 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
     [rosterData, updateDataAndSave]
   );
 
-  const resetAllSchedules = () => {
+  const resetAllSchedules = useCallback(() => {
     const newData = rosterData.map(group => ({
       ...group,
       drivers: group.drivers.map(driver => ({
@@ -1432,11 +1519,11 @@ export function useRosterData(year: number, month: number, daysArray: number[]) 
       })),
     }));
     updateDataAndSave(newData);
-  };
+  }, [rosterData, updateDataAndSave]);
 
-  const clearAllData = () => {
+  const clearAllData = useCallback(() => {
     updateDataAndSave([]);
-  };
+  }, [updateDataAndSave]);
 
   return {
     rosterData,

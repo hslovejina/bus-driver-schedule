@@ -825,7 +825,6 @@ function RosterTableRowComponent(props: Props) {
         );
       })}
 
-      {/* 우측 통계 열: 민영제는 현재 글자 크기(15px) 그대로 좌우 여백(px-0)을 최소화해 3자리(36px) / 9자리(80px) 폭에 맞춤 */}
       {isPrivate ? (
         <>
           <td
@@ -962,5 +961,72 @@ function RosterTableRowComponent(props: Props) {
   );
 }
 
-const RosterTableRow = React.memo(RosterTableRowComponent);
+// ✨ 모달 이동 시 관계없는 행(가이드라인이나 활성 셀에 해당하지 않는 아래쪽 행들)의 불필요한 리렌더링을 건너뛰는 비교 함수
+function areRowPropsEqual(prev: Props, next: Props): boolean {
+  if (
+    prev.bIdx !== next.bIdx ||
+    prev.dIdx !== next.dIdx ||
+    prev.busGroup !== next.busGroup ||
+    prev.driver !== next.driver ||
+    prev.rowStats !== next.rowStats ||
+    prev.cellWarnings !== next.cellWarnings ||
+    prev.todayDay !== next.todayDay ||
+    prev.highlightFilter !== next.highlightFilter ||
+    prev.searchQuery !== next.searchQuery ||
+    prev.year !== next.year ||
+    prev.month !== next.month ||
+    prev.daysArray !== next.daysArray ||
+    prev.holidays !== next.holidays ||
+    prev.rosterDataLength !== next.rosterDataLength ||
+    prev.isLastInGroup !== next.isLastInGroup ||
+    prev.nameAlign !== next.nameAlign ||
+    prev.isMenuActive !== next.isMenuActive ||
+    prev.isDriverEditing !== next.isDriverEditing ||
+    prev.editingBusIndex !== next.editingBusIndex ||
+    prev.hourlyWage !== next.hourlyWage ||
+    prev.maxSalary !== next.maxSalary ||
+    prev.minSalary !== next.minSalary ||
+    prev.showLongShifts !== next.showLongShifts ||
+    prev.sortedLongShifts !== next.sortedLongShifts ||
+    prev.routeType !== next.routeType ||
+    prev.prevMonthLastDayWork !== next.prevMonthLastDayWork ||
+    prev.nextMonthFirstDayWork !== next.nextMonthFirstDayWork ||
+    prev.duplicateShifts !== next.duplicateShifts ||
+    prev.routeInfo !== next.routeInfo ||
+    prev.allRoutes !== next.allRoutes ||
+    prev.maxDriverOrder !== next.maxDriverOrder
+  ) {
+    return false;
+  }
+
+  const pModal = prev.scheduleModalObj;
+  const nModal = next.scheduleModalObj;
+  if (pModal === nModal) return true;
+
+  const pActive = !!pModal;
+  const nActive = !!nModal;
+  // 모달이 새로 열리거나 닫힐 때는 전체 행 배경 투명도(opacity-20)가 바뀌므로 리렌더링
+  if (pActive !== nActive) return false;
+  if (!pModal || !nModal) return true;
+
+  const rowIdx = next.bIdx * 100 + next.dIdx;
+  const pTargetIdx = pModal.bIdx * 100 + pModal.dIdx;
+  const nTargetIdx = nModal.bIdx * 100 + nModal.dIdx;
+
+  // 이전 또는 현재 타겟 행이거나 그 위쪽 행(세로 파란 안내선 표시 대상)인 경우에만 리렌더링
+  const wasAffected = rowIdx <= pTargetIdx;
+  const isAffected = rowIdx <= nTargetIdx;
+
+  if (!wasAffected && !isAffected) {
+    return true;
+  }
+
+  return (
+    pModal.bIdx === nModal.bIdx &&
+    pModal.dIdx === nModal.dIdx &&
+    pModal.day === nModal.day
+  );
+}
+
+const RosterTableRow = React.memo(RosterTableRowComponent, areRowPropsEqual);
 export default RosterTableRow;

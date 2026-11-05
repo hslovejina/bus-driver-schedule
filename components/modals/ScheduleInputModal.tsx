@@ -85,11 +85,10 @@ export default function ScheduleInputModal({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const margin = 12;
-    const topSafe = 52; // 상단 헤더 아래 안전선
-    const bottomSafe = vh - 46; // 하단 네비게이션 탭 위 안전선
-    const cellGap = 22; // 확대(scale-1.15)된 셀 테두리와의 여유 간격
+    const topSafe = 52;
+    const bottomSafe = vh - 46;
+    const cellGap = 22;
 
-    // 사용자가 현재 셀에서 직접 드래그해 둔 경우 화면 밖으로 나가지 않게만 보정
     if (hasUserDraggedRef.current) {
       setPosition(prev => ({
         x: Math.min(Math.max(margin, prev.x), Math.max(margin, vw - modalW - margin)),
@@ -111,7 +110,7 @@ export default function ScheduleInputModal({
     }
 
     const cellRect = cellEl.getBoundingClientRect();
-    const stickyLeftEdge = 114; // 좌측 고정열(순서·차번·성명) 우측 끝선
+    const stickyLeftEdge = isPrivate ? 206 : 114;
 
     const spaceRight = vw - margin - (cellRect.right + cellGap);
     const spaceLeftFromSticky = cellRect.left - cellGap - stickyLeftEdge;
@@ -123,16 +122,13 @@ export default function ScheduleInputModal({
     let targetY = topSafe;
 
     if (spaceRight >= modalW) {
-      // 1순위: 셀 오른쪽에 충분한 공간이 있으면 셀 우측에 배치 (셀 및 좌/상단 파란 안내선 모두 비가림)
       targetX = Math.min(cellRect.right + cellGap + 8, vw - modalW - margin);
       const idealY = cellRect.top - 16;
       targetY = Math.min(Math.max(topSafe, idealY), Math.max(topSafe, bottomSafe - modalH));
     } else if (spaceLeftFromSticky >= modalW || spaceLeftTotal >= modalW) {
-      // 2순위: 우측 날짜(월 후반부) 클릭 시 셀 왼쪽에 배치
       const minLeftX = spaceLeftFromSticky >= modalW ? stickyLeftEdge : margin;
       targetX = Math.max(minLeftX, cellRect.left - modalW - cellGap - 8);
 
-      // 가로 파란 안내선(해당 행)까지 가리지 않도록 아래나 위에 공간이 있으면 우선 배치
       if (spaceBelow >= modalH) {
         targetY = cellRect.bottom + cellGap;
       } else if (spaceAbove >= modalH) {
@@ -142,15 +138,18 @@ export default function ScheduleInputModal({
         targetY = Math.min(Math.max(topSafe, idealY), Math.max(topSafe, bottomSafe - modalH));
       }
     } else if (spaceBelow >= modalH) {
-      // 3순위: 좁은 화면에서는 셀 아래쪽에 배치
       targetY = cellRect.bottom + cellGap;
-      targetX = Math.min(Math.max(margin, cellRect.left - modalW / 3), Math.max(margin, vw - modalW - margin));
+      targetX = Math.min(
+        Math.max(margin, cellRect.left - modalW / 3),
+        Math.max(margin, vw - modalW - margin)
+      );
     } else if (spaceAbove >= modalH) {
-      // 4순위: 셀 위쪽에 배치
       targetY = cellRect.top - modalH - cellGap;
-      targetX = Math.min(Math.max(margin, cellRect.left - modalW / 3), Math.max(margin, vw - modalW - margin));
+      targetX = Math.min(
+        Math.max(margin, cellRect.left - modalW / 3),
+        Math.max(margin, vw - modalW - margin)
+      );
     } else {
-      // 5순위: 초소형 화면 폴백 — 셀과 반대쪽 코너에 배치하여 입력 칸 겹침 방지
       targetX = cellRect.left > vw / 2 ? margin : Math.max(margin, vw - modalW - margin);
       targetY = cellRect.top > vh / 2 ? topSafe : Math.max(topSafe, bottomSafe - modalH);
     }
@@ -159,9 +158,8 @@ export default function ScheduleInputModal({
       x: Math.round(targetX),
       y: Math.round(targetY),
     });
-  }, [modalObj]);
+  }, [modalObj, isPrivate]);
 
-  // 새 셀이 선택될 때마다 드래그 여부 초기화 및 스마트 위치 적용
   useEffect(() => {
     if (!modalObj) return;
     setViewMode('MAIN');
@@ -188,7 +186,54 @@ export default function ScheduleInputModal({
     };
   }, [modalObj, updateSmartPosition]);
 
-  // 오전/오후 서브메뉴 진입 또는 맞교대 배너 표시로 모달 크기가 변할 때도 셀을 가리지 않도록 자동 보정
+  // ✨ PC 키보드 단축키 지원 (ESC: 뒤로/닫기, Delete/Backspace: 빈칸 비우기, 1/2: 오전/오후 선택창)
+  useEffect(() => {
+    if (!modalObj) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputFocused =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT';
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (pendingSwap) {
+          setPendingSwap(null);
+        } else if (!isPrivate && viewMode !== 'MAIN') {
+          setViewMode('MAIN');
+        } else {
+          onClose();
+        }
+        return;
+      }
+
+      if (isInputFocused) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onApply(null, false);
+        return;
+      }
+
+      if (!isPrivate && viewMode === 'MAIN') {
+        if (e.key === '1') {
+          e.preventDefault();
+          setPendingSwap(null);
+          setViewMode('AM');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setPendingSwap(null);
+          setViewMode('PM');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalObj, viewMode, pendingSwap, isPrivate, onClose, onApply]);
+
   useEffect(() => {
     const el = modalRef.current;
     if (!el || !modalObj) return;
@@ -322,6 +367,7 @@ export default function ScheduleInputModal({
         </div>
         <button
           onClick={onClose}
+          title="닫기 (ESC)"
           className="p-1.5 xl:p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-default"
         >
           <X size={20} strokeWidth={3} className="xl:w-[24px] xl:h-[24px]" />
@@ -503,6 +549,7 @@ export default function ScheduleInputModal({
                       setPendingSwap(null);
                       setViewMode('AM');
                     }}
+                    title="단축키: 숫자 1"
                     className="py-5 xl:py-9 bg-gradient-to-b from-orange-50 to-orange-100 hover:from-orange-500 hover:to-orange-600 text-orange-600 hover:text-white font-black rounded-[16px] xl:rounded-[20px] transition-all border border-orange-200 hover:border-orange-500 shadow-sm active:scale-95 text-[21px] xl:text-[26px] tracking-[0.2em] pl-[0.2em]"
                   >
                     오전
@@ -512,6 +559,7 @@ export default function ScheduleInputModal({
                       setPendingSwap(null);
                       setViewMode('PM');
                     }}
+                    title="단축키: 숫자 2"
                     className="py-5 xl:py-9 bg-gradient-to-b from-blue-50 to-blue-100 hover:from-blue-500 hover:to-blue-600 text-blue-600 hover:text-white font-black rounded-[16px] xl:rounded-[20px] transition-all border border-blue-200 hover:border-blue-500 shadow-sm active:scale-95 text-[21px] xl:text-[26px] tracking-[0.2em] pl-[0.2em]"
                   >
                     오후
@@ -563,6 +611,7 @@ export default function ScheduleInputModal({
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => onApply(null, false)}
+                title="단축키: Delete 또는 Backspace"
                 className={`${
                   isPrivate ? 'col-span-2' : ''
                 } py-3 xl:py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 font-extrabold rounded-xl xl:rounded-2xl transition-all active:scale-95 text-[14.5px] xl:text-[16px] flex items-center justify-center gap-1.5 border border-slate-200 shadow-xs`}
@@ -709,7 +758,7 @@ export default function ScheduleInputModal({
       >
         <MousePointerClick size={15} className="text-slate-400" />
         <span className="text-[12px] xl:text-[13px] font-bold text-slate-400">
-          여기를 드래그하여 이동
+          드래그하여 이동 · Delete: 비우기 · ESC: 닫기
         </span>
       </div>
     </div>
