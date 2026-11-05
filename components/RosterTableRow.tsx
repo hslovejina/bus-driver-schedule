@@ -117,7 +117,6 @@ function RosterTableRowComponent(props: Props) {
 
   const [localBusEditVal, setLocalBusEditVal] = useState('');
   const [localDriverEditVal, setLocalDriverEditVal] = useState('');
-  // ✨ 첫 요일 1개만 선택하면 다음 연속 요일이 자동으로 짝지어지도록 단일 상태로 변경
   const [restStartDay, setRestStartDay] = useState<string>('일');
   const [syncPartnerRest, setSyncPartnerRest] = useState<boolean>(true);
 
@@ -156,7 +155,6 @@ function RosterTableRowComponent(props: Props) {
     handleDriverEditConfirmUI(bIdx, dIdx, localDriverEditVal);
   };
 
-  // ✨ 첫 요일 선택 시 연속된 뒷 요일을 자동으로 계산해 2일 휴무쌍(예: '일' ➔ ['일', '월'], '토' ➔ ['토', '일'])으로 저장
   const onConfirmDefaultRest = () => {
     const firstIdx = DOW_OPTIONS.indexOf(restStartDay);
     const validFirstIdx = firstIdx >= 0 ? firstIdx : 0;
@@ -173,6 +171,7 @@ function RosterTableRowComponent(props: Props) {
   }, [restStartDay]);
 
   const isPrivate = routeType === 'PRIVATE';
+  const isFitToScreen = !showLongShifts || isPrivate;
   const maxShiftCount = routeInfo?.weekdayCount || maxDriverOrder || 50;
   const effectiveAlign = nameAlign || (dIdx === 0 ? 'left' : 'right');
 
@@ -532,7 +531,6 @@ function RosterTableRowComponent(props: Props) {
               </button>
             </div>
 
-            {/* ✨ 2행: 기본휴무 단일 드롭다운 (첫 요일만 선택하면 연속된 뒷 요일이 자동 포함됨) */}
             {!isPrivate && (
               <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-700">
                 <span className="flex items-center justify-center bg-slate-900 border border-emerald-400/70 text-emerald-300 font-black text-[12px] px-2.5 py-1.5 rounded-lg tracking-tight select-none">
@@ -625,7 +623,7 @@ function RosterTableRowComponent(props: Props) {
         const isGuideCell = isGuideRow || isGuideCol;
 
         let textColor = 'text-slate-900';
-        let fontWeightClass = 'font-black text-[18px]';
+        let fontWeightClass = 'font-black text-[17px] xl:text-[18px]';
         let hasPrivateWarning = false;
 
         const isRegularPrivateShift =
@@ -641,11 +639,13 @@ function RosterTableRowComponent(props: Props) {
           const baseWork = driver.baseSchedules?.[String(day)];
           const isDefault = baseWork !== undefined && baseWork === work;
 
-          fontWeightClass = isDefault ? 'font-normal text-[18px]' : 'font-black text-[18px]';
+          fontWeightClass = isDefault
+            ? 'font-normal text-[17px] xl:text-[18px]'
+            : 'font-black text-[17px] xl:text-[18px]';
 
           if (isDuplicate || isSatDrop || isSunDrop) {
             textColor = 'text-red-600';
-            fontWeightClass = 'font-black text-[18px]';
+            fontWeightClass = 'font-black text-[17px] xl:text-[18px]';
             hasPrivateWarning = true;
           }
         }
@@ -701,7 +701,7 @@ function RosterTableRowComponent(props: Props) {
         } else if (work === '신청휴무') {
           content = (
             <span
-              className={`font-black text-[22px] flex items-center justify-center leading-none ${
+              className={`font-black text-[20px] xl:text-[22px] flex items-center justify-center leading-none ${
                 isActiveCell ? 'text-blue-600' : 'text-slate-500'
               }`}
             >
@@ -713,14 +713,15 @@ function RosterTableRowComponent(props: Props) {
         } else {
           const isStandardPill =
             work.includes('전') || work.includes('후') || work === '연차' || work === '연';
-          let fontSizeClass = 'text-[13px]';
+          let fontSizeClass = 'text-[12px] xl:text-[13px]';
           if (!isStandardPill) {
-            if (work.length <= 2) fontSizeClass = 'text-[15px]';
-            else if (work.length === 3) fontSizeClass = 'text-[13px] tracking-tight';
-            else fontSizeClass = 'text-[11.5px] tracking-tighter';
+            if (work.length <= 2) fontSizeClass = 'text-[13.5px] xl:text-[15px]';
+            else if (work.length === 3) fontSizeClass = 'text-[12px] xl:text-[13px] tracking-tight';
+            else fontSizeClass = 'text-[11px] xl:text-[11.5px] tracking-tighter';
           }
 
-          let pillClass = `m-auto w-[37px] h-[31px] font-black rounded-[4px] ${fontSizeClass} leading-none shadow-sm border flex items-center justify-center px-0.5 overflow-hidden relative `;
+          // 열 너비가 PC 화면에 맞춰 유연하게 조절될 때 배지도 함께 맞춰지도록 w-[calc(100%-3px)] 적용
+          let pillClass = `m-auto w-[calc(100%-3px)] max-w-[40px] h-[30px] font-black rounded-[4px] ${fontSizeClass} leading-none shadow-sm border flex items-center justify-center px-0.5 overflow-hidden relative `;
           if (hasPublicWarning) {
             pillClass += 'ring-[2px] ring-red-600 ring-offset-0 ';
           }
@@ -760,7 +761,11 @@ function RosterTableRowComponent(props: Props) {
                 setScheduleModalObj({ bIdx, dIdx, day, dayType });
               }
             }}
-            className={`w-[40px] min-w-[40px] max-w-[40px] text-center p-0 border-r border-slate-200 align-middle cursor-pointer relative ${
+            className={`${
+              isFitToScreen
+                ? 'w-[40px] min-w-[40px] lg:w-auto lg:min-w-0 lg:max-w-none'
+                : 'w-[40px] min-w-[40px] max-w-[40px]'
+            } text-center p-0 border-r border-slate-200 align-middle cursor-pointer relative ${
               isActiveCell
                 ? 'z-[200] bg-white ring-[3px] ring-blue-500 shadow-[0_0_20px_5px_rgba(59,130,246,0.8)] scale-[1.15] rounded-lg overflow-visible'
                 : isGuideCell
@@ -808,10 +813,11 @@ function RosterTableRowComponent(props: Props) {
         );
       })}
 
+      {/* 3. 우측 통계 셀: thead 및 tfoot과 완벽히 동일한 너비 및 border-l / border-r 적용 */}
       {isPrivate ? (
         <>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-50 align-middle shadow-[inset_1px_0_2px_rgba(0,0,0,0.05)] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[42px] min-w-[42px] text-center py-1 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
             <span className="font-black text-slate-800 text-[15px]">
               {isCompletelyEmptySlot ? '' : rowStats.totalWorkDays}
@@ -841,77 +847,77 @@ function RosterTableRowComponent(props: Props) {
       ) : (
         <>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-50 align-middle shadow-[inset_1px_0_2px_rgba(0,0,0,0.05)] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[38px] min-w-[38px] xl:w-[40px] text-center py-1 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? (
               ''
             ) : isDeficientWorkDays ? (
-              <span className="inline-flex items-center justify-center min-w-[28px] h-[24px] bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[15px] shadow-sm">
+              <span className="inline-flex items-center justify-center min-w-[26px] h-[23px] bg-red-50 text-red-600 ring-[2px] ring-red-500 rounded font-black text-[14px] xl:text-[15px] shadow-sm">
                 {rowStats.totalWorkDays}
               </span>
             ) : (
-              <span className="font-black text-slate-800 text-[15px]">{rowStats.totalWorkDays}</span>
+              <span className="font-black text-slate-800 text-[14px] xl:text-[15px]">{rowStats.totalWorkDays}</span>
             )}
           </td>
           <td
-            className={`w-[36px] min-w-[36px] text-center py-1 border-r border-orange-100 bg-orange-50/40 font-black text-orange-700 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[32px] min-w-[32px] xl:w-[34px] text-center py-1 border-r border-orange-100 bg-orange-50/40 font-black text-orange-700 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.amCount || 0}
           </td>
           <td
-            className={`w-[36px] min-w-[36px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-blue-50/50 font-black text-blue-700 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[32px] min-w-[32px] xl:w-[34px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-blue-50/50 font-black text-blue-700 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.pmCount || 0}
           </td>
 
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-r border-emerald-200 bg-emerald-100/70 font-black text-emerald-950 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[38px] min-w-[38px] xl:w-[40px] text-center py-1 border-r border-emerald-200 bg-emerald-100/70 font-black text-emerald-950 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.targetSojeong}
           </td>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-emerald-50/60 font-black text-emerald-900 text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[38px] min-w-[38px] xl:w-[40px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-emerald-50/60 font-black text-emerald-900 text-[13.5px] xl:text-[14.5px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.fixedRestsStr}
           </td>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-r border-rose-100 bg-rose-50/50 font-black text-rose-600 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[36px] min-w-[36px] xl:w-[38px] text-center py-1 border-r border-rose-100 bg-rose-50/50 font-black text-rose-600 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.jeolnalTotal}
           </td>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-r border-orange-100 bg-orange-50/40 font-black text-orange-600 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[36px] min-w-[36px] xl:w-[38px] text-center py-1 border-r border-orange-100 bg-orange-50/40 font-black text-orange-600 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.overtimeDays}
           </td>
           <td
-            className={`w-[42px] min-w-[42px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-red-50/60 font-black text-red-700 text-[15px] ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[38px] min-w-[38px] xl:w-[40px] text-center py-1 border-r-[2.5px] border-r-slate-700 bg-red-50/60 font-black text-red-700 text-[14px] xl:text-[15px] ${borderBottomClass} ${generalDimClass}`}
           >
             {isCompletelyEmptySlot ? '' : rowStats.extraTotal}
           </td>
 
           <td
-            className={`w-[85px] min-w-[85px] text-center py-1 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
+            className={`w-[80px] min-w-[80px] xl:w-[84px] text-center py-1 bg-slate-50 align-middle ${borderBottomClass} ${generalDimClass}`}
           >
             {(() => {
               if (isCompletelyEmptySlot) return '';
               const salary = rowStats.expectedSalary;
               if (salary === 0)
-                return <span className="font-black text-slate-900 text-[14.5px]">0</span>;
+                return <span className="font-black text-slate-900 text-[13.5px] xl:text-[14.5px]">0</span>;
               if (salary === maxSalary)
                 return (
-                  <span className="inline-flex whitespace-nowrap px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md font-black text-[13.5px] shadow-sm tracking-tight">
+                  <span className="inline-flex whitespace-nowrap px-1 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md font-black text-[12.5px] xl:text-[13.5px] shadow-sm tracking-tighter">
                     {salary.toLocaleString()}
                   </span>
                 );
               if (salary === minSalary)
                 return (
-                  <span className="inline-flex whitespace-nowrap px-1.5 py-0.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-md font-black text-[13.5px] shadow-sm tracking-tight">
+                  <span className="inline-flex whitespace-nowrap px-1 py-0.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-md font-black text-[12.5px] xl:text-[13.5px] shadow-sm tracking-tighter">
                     {salary.toLocaleString()}
                   </span>
                 );
               return (
-                <span className="font-black text-slate-900 text-[14.5px] tracking-tight">
+                <span className="font-black text-slate-900 text-[13.5px] xl:text-[14.5px] tracking-tighter">
                   {salary.toLocaleString()}
                 </span>
               );

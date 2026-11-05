@@ -360,7 +360,6 @@ export default function RosterView() {
     );
   }, [rosterData]);
 
-  // ✨ 초기세팅 버튼 클릭 핸들러 (공공관리제 & 민영제 통합)
   const handleInitialSetupClick = () => {
     if (processedRoster.length === 0) {
       if (!prevMonthRoster || prevMonthRoster.length === 0) {
@@ -375,13 +374,11 @@ export default function RosterView() {
       return;
     }
 
-    // 민영제 노선은 기본휴무(요일 2개) 개념이 없으므로 바로 확인 모달 오픈
     if (isPrivate) {
       setIsInitialSetupModalOpen(true);
       return;
     }
 
-    // 공공관리제 노선: 기본휴무 미지정 기사 검증 (당월/전월 근무에서 추론 가능하면 통과)
     const missingDrivers: string[] = [];
     processedRoster.forEach((group, bIdx) => {
       group.drivers.forEach((drv: DriverInfo, dIdx: number) => {
@@ -941,6 +938,12 @@ export default function RosterView() {
     ? 'z-[201] bg-white text-blue-800 ring-[3px] ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] rounded-lg'
     : 'z-50 bg-slate-200 text-slate-800 shadow-[inset_-2px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.1)]';
 
+  // thead 상/하단 굵은 가로선 전용 (세로 방향 X-offset을 0으로 두어 tbody의 border-l/r과 어긋나지 않게 함)
+  const thTopBotShadow = 'shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569]';
+
+  // 추가표시가 꺼져 있을 때는 PC(lg 이상)에서 w-full로 화면 가로 폭에 100% 꽉 차게 맞춤
+  const isFitToScreen = !showLongShifts || isPrivate;
+
   return (
     <div className="flex flex-col w-full h-full bg-slate-50 font-sans overscroll-none relative">
       {toast && (
@@ -977,7 +980,7 @@ export default function RosterView() {
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors shrink-0"
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors shrink-0"
           >
             <X size={16} strokeWidth={2.5} />
           </button>
@@ -991,43 +994,45 @@ export default function RosterView() {
         />
       )}
 
+      {/* 1. 상단 헤더: 주의 배지가 떠도 좌우 스크롤바가 절대 생기지 않도록 1줄 자동 맞춤 (overflow-hidden) */}
       <header
-        className={`flex flex-nowrap items-center justify-between gap-1.5 xl:gap-2 px-2 sm:px-3 xl:px-4 py-1.5 xl:py-2.5 bg-white border-b border-gray-200 shadow-sm shrink-0 relative overflow-x-auto ${
+        className={`flex flex-nowrap items-center justify-between gap-1 xl:gap-1.5 px-2 sm:px-3 py-1.5 xl:py-2 bg-white border-b border-gray-200 shadow-sm shrink-0 relative overflow-hidden ${
           isModalActive ? 'z-[210] pointer-events-none' : 'z-50'
         }`}
       >
-        <div className="flex items-center flex-nowrap gap-1 xl:gap-2 shrink-0">
-          <div className="flex items-center bg-white border-[2px] border-slate-200 hover:border-blue-300 rounded-xl xl:rounded-2xl shadow-sm p-0.5 transition-colors shrink-0">
+        {/* 좌측 컨트롤 그룹 */}
+        <div className="flex items-center flex-nowrap gap-1 xl:gap-1.5 shrink-0">
+          <div className="flex items-center bg-white border-[2px] border-slate-200 hover:border-blue-300 rounded-xl shadow-sm p-0.5 transition-colors shrink-0">
             <button
               onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
-              className="p-1 xl:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
+              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all active:scale-95"
             >
-              <ChevronLeft size={16} strokeWidth={3} className="xl:w-[19px] xl:h-[19px]" />
+              <ChevronLeft size={16} strokeWidth={3} className="xl:w-[18px] xl:h-[18px]" />
             </button>
             <button
               onClick={() => setIsPickerOpen(true)}
-              className="px-1.5 xl:px-3.5 flex items-center gap-1 xl:gap-2 font-black text-[13px] xl:text-[17px] text-slate-800 hover:text-blue-600 transition-colors tracking-tighter active:scale-95 whitespace-nowrap"
+              className="px-1.5 xl:px-2.5 flex items-center gap-1 xl:gap-1.5 font-black text-[13px] xl:text-[15.5px] text-slate-800 hover:text-blue-600 transition-colors tracking-tighter active:scale-95 whitespace-nowrap"
             >
-              <CalendarDays size={15} strokeWidth={2.5} className="text-blue-500 hidden sm:block xl:w-[18px] xl:h-[18px]" />
+              <CalendarDays size={15} strokeWidth={2.5} className="text-blue-500 hidden sm:block xl:w-[17px] xl:h-[17px]" />
               {year}년 {month}월
             </button>
             <button
               onClick={() => setCurrentDate(new Date(year, month, 1))}
-              className="p-1 xl:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
+              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all active:scale-95"
             >
-              <ChevronRight size={16} strokeWidth={3} className="xl:w-[19px] xl:h-[19px]" />
+              <ChevronRight size={16} strokeWidth={3} className="xl:w-[18px] xl:h-[18px]" />
             </button>
           </div>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="h-[32px] xl:h-[40px] px-2 xl:px-3.5 flex items-center justify-center gap-0.5 xl:gap-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[14px] whitespace-nowrap shrink-0"
+            className="h-[30px] xl:h-[36px] px-2 xl:px-3 flex items-center justify-center gap-0.5 xl:gap-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[13px] whitespace-nowrap shrink-0"
           >
-            <Plus size={14} strokeWidth={3} className="xl:w-[16px] xl:h-[16px]" /> 추가
+            <Plus size={14} strokeWidth={3} className="xl:w-[15px] xl:h-[15px]" /> 추가
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="h-[32px] xl:h-[40px] px-2 xl:px-3 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
+            className="h-[30px] xl:h-[36px] px-2 xl:px-2.5 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[13px] whitespace-nowrap shrink-0"
           >
             오늘
           </button>
@@ -1035,9 +1040,9 @@ export default function RosterView() {
           <button
             type="button"
             onClick={handleInitialSetupClick}
-            className="h-[32px] xl:h-[40px] px-2 xl:px-3.5 flex items-center justify-center gap-1 xl:gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
+            className="h-[30px] xl:h-[36px] px-2 xl:px-3 flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[13px] whitespace-nowrap shrink-0"
           >
-            <Wand2 size={13} strokeWidth={2.5} className="xl:w-[15px] xl:h-[15px]" /> 초기세팅
+            <Wand2 size={13} strokeWidth={2.5} className="xl:w-[14px] xl:h-[14px]" /> 초기세팅
           </button>
 
           <div className="flex items-center bg-slate-100 rounded-lg xl:rounded-xl p-0.5 border border-slate-200 shrink-0">
@@ -1048,13 +1053,13 @@ export default function RosterView() {
               }}
               disabled={!canUndo}
               title="실행 취소 (Ctrl+Z)"
-              className={`h-[28px] xl:h-[34px] px-1.5 xl:px-2.5 rounded-md xl:rounded-lg flex items-center gap-1 font-extrabold text-[12px] xl:text-[13px] transition-all ${
+              className={`h-[26px] xl:h-[30px] px-1.5 xl:px-2 rounded-md xl:rounded-lg flex items-center gap-1 font-extrabold text-[11.5px] xl:text-[12.5px] transition-all ${
                 canUndo
                   ? 'text-slate-700 hover:bg-white hover:shadow-sm active:scale-95 cursor-pointer'
                   : 'text-slate-300 cursor-not-allowed'
               }`}
             >
-              <Undo2 size={14} strokeWidth={2.5} className="xl:w-[16px] xl:h-[16px]" />
+              <Undo2 size={13} strokeWidth={2.5} className="xl:w-[15px] xl:h-[15px]" />
               <span className="hidden 2xl:inline">되돌리기</span>
             </button>
             <button
@@ -1064,41 +1069,42 @@ export default function RosterView() {
               }}
               disabled={!canRedo}
               title="다시 실행 (Ctrl+Y)"
-              className={`h-[28px] xl:h-[34px] px-1.5 xl:px-2 rounded-md xl:rounded-lg flex items-center transition-all ${
+              className={`h-[26px] xl:h-[30px] px-1.5 xl:px-2 rounded-md xl:rounded-lg flex items-center transition-all ${
                 canRedo
                   ? 'text-slate-700 hover:bg-white hover:shadow-sm active:scale-95 cursor-pointer'
                   : 'text-slate-300 cursor-not-allowed'
               }`}
             >
-              <Redo2 size={14} strokeWidth={2.5} className="xl:w-[16px] xl:h-[16px]" />
+              <Redo2 size={13} strokeWidth={2.5} className="xl:w-[15px] xl:h-[15px]" />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 xl:gap-2.5 mx-1 xl:mx-auto shrink-0 whitespace-nowrap">
-          <Bus className="text-blue-600 hidden xl:block" size={24} strokeWidth={2.5} />
-          <h1 className="font-black text-[13.5px] sm:text-[15px] xl:text-[22px] leading-none text-gray-800 tracking-tight whitespace-nowrap">
+        {/* 중앙 제목 및 상태 배지 그룹 (flex-1 min-w-0으로 자동 폭 맞춤) */}
+        <div className="flex items-center justify-center gap-1 xl:gap-2 min-w-0 flex-1 px-1">
+          <Bus className="text-blue-600 hidden xl:block shrink-0" size={20} strokeWidth={2.5} />
+          <h1 className="font-black text-[13px] sm:text-[14.5px] xl:text-[18px] 2xl:text-[20px] leading-none text-gray-800 tracking-tight whitespace-nowrap truncate">
             {route && route !== '미지정' && (
               <span className="mr-1">
                 <span className="text-indigo-700">{route}</span> 노선
               </span>
             )}
-            {year}년 {month}월 <span className="hidden md:inline">근무 계획표</span>
+            {year}년 {month}월 <span className="hidden lg:inline">근무 계획표</span>
           </h1>
 
           {saveStatus === 'SAVING' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 font-extrabold text-[11px] xl:text-[12px]">
-              <Loader2 size={12} className="animate-spin" /> 저장 중
+            <span className="inline-flex items-center gap-1 px-1.5 xl:px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 font-extrabold text-[10.5px] xl:text-[11.5px] whitespace-nowrap shrink-0">
+              <Loader2 size={11} className="animate-spin" /> 저장 중
             </span>
           )}
           {saveStatus === 'SAVED' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-extrabold text-[11px] xl:text-[12px]">
-              <CheckCircle2 size={12} strokeWidth={2.5} /> 저장됨
+            <span className="inline-flex items-center gap-1 px-1.5 xl:px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-extrabold text-[10.5px] xl:text-[11.5px] whitespace-nowrap shrink-0">
+              <CheckCircle2 size={11} strokeWidth={2.5} /> 저장됨
             </span>
           )}
           {saveStatus === 'ERROR' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-600 font-extrabold text-[11px] xl:text-[12px]">
-              <AlertTriangle size={12} strokeWidth={2.5} /> 저장 실패
+            <span className="inline-flex items-center gap-1 px-1.5 xl:px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-600 font-extrabold text-[10.5px] xl:text-[11.5px] whitespace-nowrap shrink-0">
+              <AlertTriangle size={11} strokeWidth={2.5} /> 저장 실패
             </span>
           )}
 
@@ -1109,23 +1115,24 @@ export default function RosterView() {
                 setHighlightFilter(prev => (prev === 'WARNING' ? 'ALL' : 'WARNING'))
               }
               title="클릭하면 배차 주의(역교대·7일연속·중복·감차) 셀만 강조합니다"
-              className={`inline-flex items-center gap-1 px-2 py-0.5 xl:px-2.5 xl:py-1 rounded-full font-black text-[11px] xl:text-[12px] transition-all cursor-pointer active:scale-95 whitespace-nowrap ${
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black text-[10.5px] xl:text-[11.5px] transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0 ${
                 highlightFilter === 'WARNING'
                   ? 'bg-red-600 text-white ring-2 ring-red-300 shadow-sm'
                   : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
               }`}
             >
-              <AlertTriangle size={12} strokeWidth={2.5} />
+              <AlertTriangle size={11} strokeWidth={2.5} />
               주의 {totalWarningCount}건
             </button>
           )}
         </div>
 
-        <div className="flex items-center flex-nowrap justify-end gap-1 xl:gap-2 shrink-0">
+        {/* 우측 필터 및 기능 버튼 그룹 */}
+        <div className="flex items-center flex-nowrap justify-end gap-1 xl:gap-1.5 shrink-0">
           <select
             value={highlightFilter}
             onChange={e => setHighlightFilter(e.target.value)}
-            className={`h-[32px] xl:h-[40px] px-1.5 xl:px-2.5 rounded-lg xl:rounded-xl border font-extrabold text-[11.5px] xl:text-[13px] outline-none transition-colors cursor-pointer shrink-0 ${
+            className={`h-[30px] xl:h-[36px] px-1.5 xl:px-2 rounded-lg xl:rounded-xl border font-extrabold text-[11px] xl:text-[12.5px] outline-none transition-colors cursor-pointer shrink-0 ${
               highlightFilter !== 'ALL'
                 ? 'bg-indigo-600 text-white border-indigo-600'
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
@@ -1156,13 +1163,13 @@ export default function RosterView() {
           </select>
 
           <div className="relative flex items-center shrink-0">
-            <Search size={13} className="absolute left-2 text-slate-400 pointer-events-none" />
+            <Search size={12} className="absolute left-2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="성명·차번"
-              className="w-[88px] xl:w-[120px] focus:w-[110px] xl:focus:w-[140px] h-[32px] xl:h-[40px] pl-6 pr-5 bg-slate-50 border border-slate-200 rounded-lg xl:rounded-xl text-[12px] xl:text-[13px] font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-400 transition-all"
+              className="w-[74px] xl:w-[96px] focus:w-[92px] xl:focus:w-[116px] h-[30px] xl:h-[36px] pl-5 pr-4 bg-slate-50 border border-slate-200 rounded-lg xl:rounded-xl text-[11.5px] xl:text-[12.5px] font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-400 transition-all"
             />
             {searchQuery && (
               <button
@@ -1170,7 +1177,7 @@ export default function RosterView() {
                 onClick={() => setSearchQuery('')}
                 className="absolute right-1 p-0.5 text-slate-400 hover:text-slate-600"
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             )}
           </div>
@@ -1178,28 +1185,27 @@ export default function RosterView() {
           {!isPrivate && (
             <button
               onClick={() => setShowLongShifts(!showLongShifts)}
-              className="h-[32px] xl:h-[40px] px-2 xl:px-3 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
+              className="h-[30px] xl:h-[36px] px-2 xl:px-2.5 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[12.5px] whitespace-nowrap shrink-0"
             >
-              <LayoutList size={14} strokeWidth={2.5} className="xl:w-[16px] xl:h-[16px]" />
+              <LayoutList size={13} strokeWidth={2.5} className="xl:w-[15px] xl:h-[15px]" />
               {showLongShifts ? '감추기' : '추가표시'}
             </button>
           )}
           <button
             onClick={handleExportExcel}
-            className="h-[32px] xl:h-[40px] px-2 xl:px-3 flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
+            className="h-[30px] xl:h-[36px] px-2 xl:px-2.5 flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[12.5px] whitespace-nowrap shrink-0"
           >
-            <Download size={14} strokeWidth={2.5} className="text-emerald-600 xl:w-[16px] xl:h-[16px]" /> 엑셀저장
+            <Download size={13} strokeWidth={2.5} className="text-emerald-600 xl:w-[15px] xl:h-[15px]" /> 엑셀저장
           </button>
           <button
             onClick={() => setIsResetModalOpen(true)}
-            className="h-[32px] xl:h-[40px] px-2 xl:px-3 flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
+            className="h-[30px] xl:h-[36px] px-2 xl:px-2.5 flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[11.5px] xl:text-[12.5px] whitespace-nowrap shrink-0"
           >
-            <RotateCcw size={14} strokeWidth={3} className="text-red-500 xl:w-[16px] xl:h-[16px]" /> 초기화
+            <RotateCcw size={13} strokeWidth={3} className="text-red-500 xl:w-[15px] xl:h-[15px]" /> 초기화
           </button>
         </div>
       </header>
 
-      {/* 스마트폰 세로 모드 진입 시 원클릭 가로모드 전환 안내 바 */}
       {showLandscapePrompt && (
         <div className="bg-indigo-900 text-white px-3 py-2 flex items-center justify-between gap-2 text-[12.5px] font-bold shrink-0 z-50">
           <span>📱 배차표는 가로 화면에 최적화되어 있습니다.</span>
@@ -1223,7 +1229,6 @@ export default function RosterView() {
       )}
 
       <div className="flex-1 bg-slate-100 p-0 sm:p-2 flex flex-col min-h-0 relative">
-        {/* 배율이 100%가 아닐 때 우측 하단에 원래 크기(100%) 복원 버튼 표시 */}
         {scale !== 1 && (
           <button
             type="button"
@@ -1238,9 +1243,12 @@ export default function RosterView() {
           ref={containerRef}
           className="flex-1 overflow-auto relative touch-pan-x touch-pan-y touch-pinch-zoom shadow-sm"
         >
+          {/* 2. 기본 상태(isFitToScreen)일 때 PC(lg:w-full)에서 화면 가로 크기에 100% 꽉 차게 렌더링 */}
           <table
             style={{ zoom: scale } as React.CSSProperties}
-            className={`w-max min-w-full border-collapse text-sm table-fixed border-0 border-r-[2.5px] ${
+            className={`${
+              isFitToScreen ? 'w-max min-w-full lg:w-full' : 'w-max min-w-full'
+            } border-collapse text-sm table-fixed border-0 border-r-[2.5px] ${
               isModalActive ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-700'
             }`}
           >
@@ -1274,7 +1282,7 @@ export default function RosterView() {
                     rowSpan={headerRowSpan}
                     onClick={handleAutoExtractRestDaysUI}
                     title="클릭 시 미지정(-) 기사의 기본휴무만 자동 설정합니다 (이미 지정된 기본휴무는 유지)"
-                    className={`w-[44px] min-w-[44px] max-w-[44px] py-2 border-0 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[12px] align-middle leading-tight cursor-pointer transition-colors select-none shadow-[inset_-2px_0_0_#475569,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
+                    className={`w-[44px] min-w-[44px] max-w-[44px] py-2 border-r-[2px] border-r-slate-500 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-[12px] align-middle leading-tight cursor-pointer transition-colors select-none shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
                   >
                     기본<br />휴무
                   </th>
@@ -1304,20 +1312,24 @@ export default function RosterView() {
                   const thActiveClass = isTargetDate
                     ? 'z-[201] bg-white ring-[3px] ring-blue-500 shadow-[0_0_20px_5px_rgba(59,130,246,0.8)] scale-[1.15] relative rounded-lg overflow-visible'
                     : isToday
-                    ? 'shadow-[inset_-1px_0_0_#cbd5e1,inset_0_2.5px_0_#2563eb,inset_0_-2.5px_0_#2563eb] overflow-hidden'
-                    : 'shadow-[inset_-1px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#475569] overflow-hidden';
+                    ? 'shadow-[inset_0_2.5px_0_#2563eb,inset_0_-2.5px_0_#2563eb] overflow-hidden'
+                    : `${thTopBotShadow} overflow-hidden`;
 
                   return (
                     <th
                       key={day}
                       rowSpan={headerRowSpan}
-                      className={`w-[40px] min-w-[40px] max-w-[40px] py-1.5 border-0 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
+                      className={`${
+                        isFitToScreen
+                          ? 'w-[40px] min-w-[40px] lg:w-auto lg:min-w-0 lg:max-w-none'
+                          : 'w-[40px] min-w-[40px] max-w-[40px]'
+                      } py-1.5 border-r border-slate-200 text-center align-top ${bgClass} ${thDimClass} ${thActiveClass}`}
                     >
                       <div className="flex flex-col items-center justify-start h-full gap-0.5 pt-0.5 px-0.5 w-full">
-                        <span className={`text-[15px] font-black leading-none ${dateColor}`}>
+                        <span className={`text-[14px] xl:text-[15px] font-black leading-none ${dateColor}`}>
                           {day}
                         </span>
-                        <span className={`text-[11px] font-bold leading-none ${dowColor}`}>
+                        <span className={`text-[10.5px] xl:text-[11px] font-bold leading-none ${dowColor}`}>
                           {getDayOfWeekText(day)}
                         </span>
                         {dayType === 'JEOLNAL' && holidays[dateStr] ? (
@@ -1337,23 +1349,24 @@ export default function RosterView() {
                   );
                 })}
 
+                {/* 3. 우측 통계 헤더: tbody 및 tfoot과 100% 동일한 border-l / border-r 적용 */}
                 {isPrivate ? (
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-slate-200 text-slate-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
+                      className={`w-[42px] min-w-[42px] py-2 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-200 text-slate-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
                     >
                       합<br />계
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-rose-50 text-rose-700 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-1px_0_0_#fecdd3,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
+                      className={`w-[42px] min-w-[42px] py-2 border-r border-rose-100 bg-rose-50 text-rose-700 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-purple-100 text-purple-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-2.5px_0_0_#334155,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#c084fc] ${generalDimClass}`}
+                      className={`w-[42px] min-w-[42px] py-2 border-r-[2.5px] border-r-slate-700 bg-purple-100 text-purple-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#c084fc] ${generalDimClass}`}
                     >
                       복격<br />근로
                     </th>
@@ -1368,58 +1381,58 @@ export default function RosterView() {
                   <>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-slate-200 text-slate-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
+                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-l-[2.5px] border-l-slate-700 border-r border-slate-200 bg-slate-200 text-slate-800 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#64748b] ${generalDimClass}`}
                     >
                       총<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[36px] min-w-[36px] py-2 border-0 bg-orange-50 text-orange-700 font-extrabold text-[13px] align-middle leading-tight shadow-[inset_-1px_0_0_#fed7aa,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
+                      className={`w-[32px] min-w-[32px] xl:w-[34px] py-2 border-r border-orange-100 bg-orange-50 text-orange-700 font-extrabold text-[12px] xl:text-[13px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
                     >
                       오<br />전
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[36px] min-w-[36px] py-2 border-0 bg-blue-50 text-blue-700 font-extrabold text-[13px] align-middle leading-tight shadow-[inset_-2.5px_0_0_#334155,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#60a5fa] ${generalDimClass}`}
+                      className={`w-[32px] min-w-[32px] xl:w-[34px] py-2 border-r-[2.5px] border-r-slate-700 bg-blue-50 text-blue-700 font-extrabold text-[12px] xl:text-[13px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#60a5fa] ${generalDimClass}`}
                     >
                       오<br />후
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-emerald-100 text-emerald-950 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-1px_0_0_#a7f3d0,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#10b981] ${generalDimClass}`}
+                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r border-emerald-200 bg-emerald-100 text-emerald-950 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#10b981] ${generalDimClass}`}
                     >
                       소정<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-emerald-50 text-emerald-900 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-2.5px_0_0_#334155,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
+                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r-[2.5px] border-r-slate-700 bg-emerald-50 text-emerald-900 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#059669] ${generalDimClass}`}
                     >
                       고정<br />휴무
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-rose-50 text-rose-700 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-1px_0_0_#fecdd3,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
+                      className={`w-[36px] min-w-[36px] xl:w-[38px] py-2 border-r border-rose-100 bg-rose-50 text-rose-700 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fda4af] ${generalDimClass}`}
                     >
                       절<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-orange-50 text-orange-700 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-1px_0_0_#fed7aa,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
+                      className={`w-[36px] min-w-[36px] xl:w-[38px] py-2 border-r border-orange-100 bg-orange-50 text-orange-700 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#fb923c] ${generalDimClass}`}
                     >
                       연장<br />근로
                     </th>
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[42px] min-w-[42px] py-2 border-0 bg-red-100 text-red-800 font-extrabold text-[12.5px] align-middle leading-tight shadow-[inset_-2.5px_0_0_#334155,inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#f87171] ${generalDimClass}`}
+                      className={`w-[38px] min-w-[38px] xl:w-[40px] py-2 border-r-[2.5px] border-r-slate-700 bg-red-100 text-red-800 font-extrabold text-[12px] xl:text-[12.5px] align-middle leading-tight shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#f87171] ${generalDimClass}`}
                     >
                       추가<br />합계
                     </th>
 
                     <th
                       rowSpan={headerRowSpan}
-                      className={`w-[85px] min-w-[85px] py-2 border-0 bg-slate-700 text-white font-extrabold text-[14px] align-middle shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#1e293b] ${generalDimClass}`}
+                      className={`w-[80px] min-w-[80px] xl:w-[84px] py-2 border-0 bg-slate-700 text-white font-extrabold text-[13px] xl:text-[14px] align-middle shadow-[inset_0_2.5px_0_#334155,inset_0_-2.5px_0_#1e293b] ${generalDimClass}`}
                     >
                       예상급여
                     </th>
@@ -1427,7 +1440,7 @@ export default function RosterView() {
                     {!isPrivate && showLongShifts && sortedLongShifts.length > 0 && (
                       <th
                         colSpan={sortedLongShifts.length + 1}
-                        className={`py-1 border-0 bg-amber-100 text-amber-950 font-extrabold text-[13.5px] align-middle leading-tight text-center shadow-[inset_2.5px_0_0_#334155,inset_-2.5px_0_0_#334155,inset_0_2.5px_0_#334155,inset_0_-1px_0_#fcd34d] ${generalDimClass}`}
+                        className={`py-1 border-l-[2.5px] border-l-slate-700 border-r-[2.5px] border-r-slate-700 bg-amber-100 text-amber-950 font-extrabold text-[13.5px] align-middle leading-tight text-center shadow-[inset_0_2.5px_0_#334155,inset_0_-1px_0_#fcd34d] ${generalDimClass}`}
                       >
                         긴근무 순번
                       </th>
@@ -1441,17 +1454,15 @@ export default function RosterView() {
                   {sortedLongShifts.map((shift, idx) => (
                     <th
                       key={shift}
-                      className={`w-[36px] min-w-[36px] py-1 border-0 bg-amber-50 text-amber-800 font-extrabold text-[13px] align-middle leading-tight text-center ${
-                        idx === 0
-                          ? 'shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#fde68a,inset_0_-2.5px_0_#475569]'
-                          : 'shadow-[inset_-1px_0_0_#fde68a,inset_0_-2.5px_0_#475569]'
+                      className={`w-[36px] min-w-[36px] py-1 border-r border-amber-100 bg-amber-50 text-amber-800 font-extrabold text-[13px] align-middle leading-tight text-center shadow-[inset_0_-2.5px_0_#475569] ${
+                        idx === 0 ? 'border-l-[2.5px] border-l-slate-700' : ''
                       } ${generalDimClass}`}
                     >
                       {shift}
                     </th>
                   ))}
                   <th
-                    className={`w-[42px] min-w-[42px] py-1 border-0 bg-amber-200 text-amber-950 font-extrabold text-[13px] align-middle leading-tight text-center shadow-[inset_-2.5px_0_0_#334155,inset_0_-2.5px_0_#475569] ${generalDimClass}`}
+                    className={`w-[42px] min-w-[42px] py-1 border-r-[2.5px] border-r-slate-700 bg-amber-200 text-amber-950 font-extrabold text-[13px] align-middle leading-tight text-center shadow-[inset_0_-2.5px_0_#475569] ${generalDimClass}`}
                   >
                     합계
                   </th>
@@ -1767,7 +1778,7 @@ export default function RosterView() {
         isPrivate={isPrivate}
       />
 
-<ScheduleInputModal
+      <ScheduleInputModal
         modalObj={scheduleModalObj}
         onClose={() => setScheduleModalObj(null)}
         onApply={handleScheduleApplyUI}
@@ -1783,7 +1794,7 @@ export default function RosterView() {
         hasBaseSchedule={selectedCellInfo.hasBaseSchedule}
         onOpenSubstitutes={() => setIsSubstituteModalOpen(true)}
       />
-      
+
       <SubstituteListModal
         isOpen={isSubstituteModalOpen}
         onClose={() => setIsSubstituteModalOpen(false)}

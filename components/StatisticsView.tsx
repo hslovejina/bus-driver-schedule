@@ -162,7 +162,6 @@ export default function StatisticsView() {
     }
   };
 
-  // 1단계: 12개월 배차 및 근무 통계 집계 (정렬 상태가 바뀌어도 재계산되지 않도록 분리)
   const { rawFullYearDrivers, rawPartialYearDrivers, activeMonths, busOrderMap } = useMemo(() => {
     const rosterByMonth: Record<string, { rosterData: BusGroup[]; hourlyWage: number }> = {};
     rostersData.forEach((r: any) => {
@@ -394,7 +393,6 @@ export default function StatisticsView() {
     };
   }, [rostersData, routeInfo, allRoutes, holidays, defaultWage, year, isPrivate]);
 
-  // 2단계: 정렬 전용 메모이제이션 (헤더 클릭 시 12개월 재계산 없이 배열 정렬만 즉시 수행)
   const { fullYearDrivers, partialYearDrivers } = useMemo(() => {
     const sortDrivers = (list: DriverYearlyStat[]) => {
       return [...list].sort((a, b) => {
@@ -449,8 +447,8 @@ export default function StatisticsView() {
 
   const totalDriverCount = fullYearDrivers.length + partialYearDrivers.length;
   const totalColSpan = isPrivate ? 3 + 4 + 12 * 3 : 2 + 6 + 12 * 6;
+  const stickyColCount = isPrivate ? 7 : 8;
 
-  // 통계 탭 엑셀 다운로드 실행 핸들러 (클릭 시에만 excelExporter 동적 로드)
   const handleExportExcel = async () => {
     if (totalDriverCount === 0) {
       alert('저장할 통계 데이터가 없습니다.');
@@ -466,6 +464,7 @@ export default function StatisticsView() {
     });
   };
 
+  // 4. 민영제 행 렌더링: 팀(0) · 차번(36) · 성명(86) + 합계 4개 열(154, 196, 232, 270) 고정(sticky)
   const renderPrivateRow = (
     drv: DriverYearlyStat,
     idx: number,
@@ -479,14 +478,14 @@ export default function StatisticsView() {
         ? 'border-b-[2.5px] border-b-slate-700'
         : 'border-b border-slate-200';
     const stickyBg = isPartialSection
-      ? 'bg-amber-50/40 group-hover:bg-amber-50'
+      ? 'bg-amber-50 group-hover:bg-amber-100'
       : 'bg-white group-hover:bg-slate-50';
 
     return (
       <tr key={drv.name} className={`h-[34px] transition-colors group ${borderBottom}`}>
         <td
           className={`sticky left-0 z-30 w-[36px] min-w-[36px] text-center font-black text-[13.5px] text-slate-800 shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1] ${
-            drv.team === 'A' ? 'bg-sky-50/90' : 'bg-indigo-50/90'
+            drv.team === 'A' ? 'bg-sky-50' : 'bg-indigo-50'
           } ${borderBottom}`}
         >
           {drv.team}
@@ -497,36 +496,37 @@ export default function StatisticsView() {
           {drv.busNo}
         </td>
         <td
-          className={`sticky left-[86px] z-30 w-[68px] min-w-[68px] text-center font-extrabold text-[14px] text-slate-900 shadow-[inset_-2px_0_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.08)] ${stickyBg} ${borderBottom}`}
+          className={`sticky left-[86px] z-30 w-[68px] min-w-[68px] text-center font-extrabold text-[14px] text-slate-900 shadow-[inset_-2px_0_0_#475569] ${stickyBg} ${borderBottom}`}
         >
           {drv.name}
         </td>
 
+        {/* 고정된 합계 4개 열 (불투명 배경 적용으로 스크롤 시 뒤쪽 셀 비침 방지) */}
         <td
-          className={`w-[42px] min-w-[42px] text-center font-black text-[14px] ${
+          className={`sticky left-[154px] z-30 w-[42px] min-w-[42px] text-center font-black text-[14px] ${
             drv.totals.workDays > 0 ? 'text-slate-900' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.workDays > 0 ? drv.totals.workDays : '-'}
         </td>
         <td
-          className={`w-[36px] min-w-[36px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[196px] z-30 w-[36px] min-w-[36px] text-center font-black text-[13.5px] ${
             drv.totals.jeolnal > 0 ? 'text-rose-600' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.jeolnal > 0 ? drv.totals.jeolnal : '-'}
         </td>
         <td
-          className={`w-[38px] min-w-[38px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[232px] z-30 w-[38px] min-w-[38px] text-center font-black text-[13.5px] ${
             drv.totals.bokgyeok > 0 ? 'text-purple-700' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.bokgyeok > 0 ? drv.totals.bokgyeok : '-'}
         </td>
         <td
-          className={`w-[38px] min-w-[38px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[270px] z-30 w-[38px] min-w-[38px] text-center font-black text-[13.5px] ${
             drv.totals.support > 0 ? 'text-emerald-800' : 'text-slate-300'
-          } bg-emerald-100/70 border-r-[2.5px] border-r-slate-700 ${borderBottom}`}
+          } bg-emerald-100 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] ${borderBottom}`}
         >
           {drv.totals.support > 0 ? drv.totals.support : '-'}
         </td>
@@ -574,6 +574,7 @@ export default function StatisticsView() {
     );
   };
 
+  // 4. 공공관리제 행 렌더링: 차번(0) · 성명(48) + 합계 6개 열(116, 156, 196, 230, 266, 308) 고정(sticky)
   const renderPublicRow = (
     drv: DriverYearlyStat,
     idx: number,
@@ -586,63 +587,64 @@ export default function StatisticsView() {
       : 'border-b border-slate-200';
     const isSp = drv.busNo.toUpperCase() === 'SP';
     const stickyBg = isPartialSection
-      ? 'bg-amber-50/40 group-hover:bg-amber-50'
+      ? 'bg-amber-50 group-hover:bg-amber-100'
       : 'bg-white group-hover:bg-slate-50';
 
     return (
       <tr key={drv.name} className={`h-[34px] transition-colors group ${borderBottom}`}>
         <td
           className={`sticky left-0 z-30 w-[48px] min-w-[48px] text-center font-black text-[13.5px] shadow-[inset_2.5px_0_0_#334155,inset_-1px_0_0_#cbd5e1] ${
-            isSp ? 'text-indigo-700 bg-indigo-50/60' : 'text-slate-800 bg-slate-50'
+            isSp ? 'text-indigo-700 bg-indigo-50' : 'text-slate-800 bg-slate-50'
           } ${borderBottom}`}
         >
           {drv.busNo}
         </td>
         <td
-          className={`sticky left-[48px] z-30 w-[68px] min-w-[68px] text-center font-extrabold text-[14px] text-slate-900 shadow-[inset_-2px_0_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.08)] ${stickyBg} ${borderBottom}`}
+          className={`sticky left-[48px] z-30 w-[68px] min-w-[68px] text-center font-extrabold text-[14px] text-slate-900 shadow-[inset_-2px_0_0_#475569] ${stickyBg} ${borderBottom}`}
         >
           {drv.name}
         </td>
 
+        {/* 고정된 합계 6개 열 (불투명 배경 적용으로 스크롤 시 뒤쪽 셀 비침 방지) */}
         <td
-          className={`w-[40px] min-w-[40px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[116px] z-30 w-[40px] min-w-[40px] text-center font-black text-[13.5px] ${
             drv.totals.workDays > 0 ? 'text-slate-900' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.workDays > 0 ? drv.totals.workDays : '-'}
         </td>
         <td
-          className={`w-[40px] min-w-[40px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[156px] z-30 w-[40px] min-w-[40px] text-center font-black text-[13.5px] ${
             drv.totals.sojeong > 0 ? 'text-emerald-900' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.sojeong > 0 ? drv.totals.sojeong : '-'}
         </td>
         <td
-          className={`w-[34px] min-w-[34px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[196px] z-30 w-[34px] min-w-[34px] text-center font-black text-[13.5px] ${
             drv.totals.jeolnal > 0 ? 'text-rose-600' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.jeolnal > 0 ? drv.totals.jeolnal : '-'}
         </td>
         <td
-          className={`w-[36px] min-w-[36px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[230px] z-30 w-[36px] min-w-[36px] text-center font-black text-[13.5px] ${
             drv.totals.overtime > 0 ? 'text-orange-600' : 'text-slate-300'
-          } bg-emerald-50/70 border-r border-emerald-200 ${borderBottom}`}
+          } bg-emerald-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.overtime > 0 ? drv.totals.overtime : '-'}
         </td>
         <td
-          className={`w-[42px] min-w-[42px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[266px] z-30 w-[42px] min-w-[42px] text-center font-black text-[13.5px] ${
             drv.totals.extraTotal > 0 ? 'text-red-700' : 'text-slate-300'
-          } bg-red-50/60 border-r border-emerald-200 ${borderBottom}`}
+          } bg-red-50 shadow-[inset_-1px_0_0_#a7f3d0] ${borderBottom}`}
         >
           {drv.totals.extraTotal > 0 ? drv.totals.extraTotal : '-'}
         </td>
         <td
-          className={`w-[42px] min-w-[42px] text-center font-black text-[13.5px] ${
+          className={`sticky left-[308px] z-30 w-[42px] min-w-[42px] text-center font-black text-[13.5px] ${
             drv.totals.longShift > 0 ? 'text-amber-900' : 'text-slate-300'
-          } bg-amber-100/60 border-r-[2.5px] border-r-slate-700 ${borderBottom}`}
+          } bg-amber-100 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] ${borderBottom}`}
         >
           {drv.totals.longShift > 0 ? drv.totals.longShift : '-'}
         </td>
@@ -723,41 +725,40 @@ export default function StatisticsView() {
 
   return (
     <div className="flex flex-col w-full h-full bg-slate-50 font-sans overscroll-none relative">
-      {/* 상단 헤더 (1줄 자동 맞춤 및 겹침 방지) */}
-      <header className="flex flex-nowrap items-center justify-between gap-2 px-2.5 sm:px-4 py-1.5 xl:py-3 bg-white border-b border-gray-200 shadow-sm shrink-0 relative z-50 overflow-x-auto">
+      <header className="flex flex-nowrap items-center justify-between gap-2 px-2.5 sm:px-4 py-1.5 xl:py-2.5 bg-white border-b border-gray-200 shadow-sm shrink-0 relative z-50 overflow-hidden">
         <div className="flex items-center gap-1.5 xl:gap-3 shrink-0">
-          <div className="flex items-center bg-white border-[2px] border-slate-200 hover:border-blue-300 rounded-xl xl:rounded-2xl shadow-sm p-0.5 xl:p-1 transition-colors">
+          <div className="flex items-center bg-white border-[2px] border-slate-200 hover:border-blue-300 rounded-xl xl:rounded-2xl shadow-sm p-0.5 transition-colors">
             <button
               onClick={() => setYear(y => y - 1)}
-              className="p-1 xl:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
+              className="p-1 xl:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
             >
-              <ChevronLeft size={17} strokeWidth={3} className="xl:w-[20px] xl:h-[20px]" />
+              <ChevronLeft size={17} strokeWidth={3} className="xl:w-[19px] xl:h-[19px]" />
             </button>
-            <div className="px-2 xl:px-4 flex items-center gap-1.5 xl:gap-2 font-black text-[14px] xl:text-[19px] text-slate-800 tracking-tighter select-none whitespace-nowrap">
-              <CalendarDays size={16} strokeWidth={2.5} className="text-blue-500 xl:w-[20px] xl:h-[20px]" />
+            <div className="px-2 xl:px-3.5 flex items-center gap-1.5 font-black text-[14px] xl:text-[17px] text-slate-800 tracking-tighter select-none whitespace-nowrap">
+              <CalendarDays size={16} strokeWidth={2.5} className="text-blue-500 xl:w-[19px] xl:h-[19px]" />
               {year}년
             </div>
             <button
               onClick={() => setYear(y => y + 1)}
-              className="p-1 xl:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
+              className="p-1 xl:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg xl:rounded-xl transition-all active:scale-95"
             >
-              <ChevronRight size={17} strokeWidth={3} className="xl:w-[20px] xl:h-[20px]" />
+              <ChevronRight size={17} strokeWidth={3} className="xl:w-[19px] xl:h-[19px]" />
             </button>
           </div>
 
           {year !== currentYear && (
             <button
               onClick={() => setYear(currentYear)}
-              className="h-[32px] xl:h-[44px] px-3 xl:px-4 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg xl:rounded-xl shadow-md transition-all active:scale-95 text-[12.5px] xl:text-[15px] whitespace-nowrap"
+              className="h-[32px] xl:h-[38px] px-3 xl:px-3.5 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg xl:rounded-xl shadow-md transition-all active:scale-95 text-[12.5px] xl:text-[14px] whitespace-nowrap"
             >
               올해
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 xl:gap-2.5 mx-auto shrink-0 whitespace-nowrap">
-          <BarChartBig className="text-blue-600 hidden sm:block xl:w-[30px] xl:h-[30px]" size={20} strokeWidth={2.5} />
-          <h1 className="font-black text-[15px] sm:text-[17px] xl:text-[26px] leading-none text-gray-800 tracking-tight whitespace-nowrap">
+        <div className="flex items-center justify-center gap-1.5 xl:gap-2 min-w-0 flex-1 px-2 whitespace-nowrap">
+          <BarChartBig className="text-blue-600 hidden sm:block xl:w-[24px] xl:h-[24px] shrink-0" size={20} strokeWidth={2.5} />
+          <h1 className="font-black text-[15px] sm:text-[17px] xl:text-[21px] leading-none text-gray-800 tracking-tight whitespace-nowrap truncate">
             {route && route !== '미지정' && (
               <span className="mr-1.5">
                 <span className="text-indigo-700">{route}</span>노선
@@ -767,22 +768,21 @@ export default function StatisticsView() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 xl:gap-2 shrink-0">
           {activeMonths.length > 0 && (
-            <span className="px-2.5 xl:px-3.5 py-1.5 xl:py-2.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg xl:rounded-xl font-extrabold text-[11.5px] xl:text-[13.5px] whitespace-nowrap">
+            <span className="px-2.5 xl:px-3 py-1.5 xl:py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg xl:rounded-xl font-extrabold text-[11.5px] xl:text-[13px] whitespace-nowrap">
               집계월: {activeMonths[0]}월~{activeMonths[activeMonths.length - 1]}월 (총 {totalDriverCount}명)
             </span>
           )}
           <button
             onClick={handleExportExcel}
-            className="h-[32px] xl:h-[44px] px-2.5 xl:px-4 flex items-center justify-center gap-1.5 xl:gap-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12.5px] xl:text-[15px] whitespace-nowrap shrink-0"
+            className="h-[32px] xl:h-[38px] px-2.5 xl:px-3.5 flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold rounded-lg xl:rounded-xl shadow-sm transition-all active:scale-95 text-[12px] xl:text-[13.5px] whitespace-nowrap shrink-0"
           >
-            <Download size={15} strokeWidth={2.5} className="text-emerald-600 xl:w-[18px] xl:h-[18px]" /> 엑셀저장
+            <Download size={14} strokeWidth={2.5} className="text-emerald-600 xl:w-[16px] xl:h-[16px]" /> 엑셀저장
           </button>
         </div>
       </header>
 
-      {/* 스마트폰 세로 모드 진입 시 원클릭 가로모드 전환 안내 바 */}
       {showLandscapePrompt && (
         <div className="bg-indigo-900 text-white px-3 py-2 flex items-center justify-between gap-2 text-[12.5px] font-bold shrink-0 z-50">
           <span>📱 통계표는 가로 화면에 최적화되어 있습니다.</span>
@@ -805,9 +805,7 @@ export default function StatisticsView() {
         </div>
       )}
 
-      {/* 테이블 영역 */}
       <div className="flex-1 bg-slate-100 p-0 sm:p-2 flex flex-col min-h-0 relative">
-        {/* 배율이 100%가 아닐 때 우측 하단에 원래 크기(100%) 복원 버튼 표시 */}
         {scale !== 1 && (
           <button
             type="button"
@@ -851,13 +849,14 @@ export default function StatisticsView() {
                     </th>
                     <th
                       rowSpan={2}
-                      className="sticky left-[86px] z-50 w-[68px] min-w-[68px] bg-sky-100 text-slate-800 font-black text-[14px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-2px_0_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle"
+                      className="sticky left-[86px] z-50 w-[68px] min-w-[68px] bg-sky-100 text-slate-800 font-black text-[14px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-2px_0_0_#475569] align-middle"
                     >
                       성명
                     </th>
+                    {/* 고정된 합계 상위 헤더 */}
                     <th
                       colSpan={4}
-                      className="py-1.5 bg-emerald-100 text-emerald-950 font-black text-[14px] border-b border-emerald-300 border-r-[2.5px] border-r-slate-700 text-center align-middle"
+                      className="sticky left-[154px] z-50 py-1.5 bg-emerald-100 text-emerald-950 font-black text-[14px] border-b border-emerald-300 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] text-center align-middle"
                     >
                       합계
                     </th>
@@ -865,34 +864,35 @@ export default function StatisticsView() {
                       <th
                         key={m}
                         colSpan={3}
-                        className="py-1.5 bg-slate-200/75 text-slate-800 font-black text-[14px] border-b border-slate-300 border-r-[2px] border-r-slate-400 text-center align-middle"
+                        className="py-1.5 bg-slate-200 text-slate-800 font-black text-[14px] border-b border-slate-300 border-r-[2px] border-r-slate-400 text-center align-middle"
                       >
                         {m}월
                       </th>
                     ))}
                   </tr>
                   <tr className="h-[30px]">
+                    {/* 고정된 합계 하위 4개 열 헤더 */}
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'workDays' })}
-                      className="w-[42px] min-w-[42px] py-1 bg-emerald-100/80 text-emerald-950 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[154px] z-50 w-[42px] min-w-[42px] py-1 bg-emerald-100 text-emerald-950 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       근무
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'jeolnal' })}
-                      className="w-[36px] min-w-[36px] py-1 bg-emerald-100/80 text-rose-700 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[196px] z-50 w-[36px] min-w-[36px] py-1 bg-emerald-100 text-rose-700 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       절
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'bokgyeok' })}
-                      className="w-[38px] min-w-[38px] py-1 bg-emerald-100/80 text-purple-800 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[232px] z-50 w-[38px] min-w-[38px] py-1 bg-emerald-100 text-purple-800 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       복격
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'support' })}
-                      className="w-[38px] min-w-[38px] py-1 bg-emerald-200/80 text-emerald-950 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r-[2.5px] border-r-slate-700 cursor-pointer hover:bg-emerald-300 transition-colors select-none align-middle text-center"
+                      className="sticky left-[270px] z-50 w-[38px] min-w-[38px] py-1 bg-emerald-200 text-emerald-950 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] cursor-pointer hover:bg-emerald-300 transition-colors select-none align-middle text-center"
                     >
                       지원
                     </th>
@@ -906,13 +906,13 @@ export default function StatisticsView() {
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'jeolnal' })}
-                          className="w-[32px] min-w-[32px] py-1 bg-rose-50/60 text-rose-700 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-rose-100 transition-colors select-none align-middle text-center"
+                          className="w-[32px] min-w-[32px] py-1 bg-rose-50 text-rose-700 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-rose-100 transition-colors select-none align-middle text-center"
                         >
                           절
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'bokgyeok' })}
-                          className="w-[36px] min-w-[36px] py-1 bg-purple-50/60 text-purple-800 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r-[2px] border-r-slate-400 cursor-pointer hover:bg-purple-100 transition-colors select-none align-middle text-center"
+                          className="w-[36px] min-w-[36px] py-1 bg-purple-50 text-purple-800 font-extrabold text-[12px] border-b-[2.5px] border-b-slate-600 border-r-[2px] border-r-slate-400 cursor-pointer hover:bg-purple-100 transition-colors select-none align-middle text-center"
                         >
                           복격
                         </th>
@@ -938,13 +938,14 @@ export default function StatisticsView() {
                     </th>
                     <th
                       rowSpan={2}
-                      className="sticky left-[48px] z-50 w-[68px] min-w-[68px] bg-slate-200 text-slate-800 font-black text-[14px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-2px_0_0_#475569,2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle"
+                      className="sticky left-[48px] z-50 w-[68px] min-w-[68px] bg-slate-200 text-slate-800 font-black text-[14px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-2px_0_0_#475569] align-middle"
                     >
                       성명
                     </th>
+                    {/* 고정된 합계 상위 헤더 */}
                     <th
                       colSpan={6}
-                      className="py-1.5 bg-emerald-100 text-emerald-950 font-black text-[14px] border-b border-emerald-300 border-r-[2.5px] border-r-slate-700 text-center align-middle"
+                      className="sticky left-[116px] z-50 py-1.5 bg-emerald-100 text-emerald-950 font-black text-[14px] border-b border-emerald-300 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] text-center align-middle"
                     >
                       합계
                     </th>
@@ -952,46 +953,47 @@ export default function StatisticsView() {
                       <th
                         key={m}
                         colSpan={6}
-                        className="py-1.5 bg-slate-200/75 text-slate-800 font-black text-[14px] border-b border-slate-300 border-r-[2px] border-r-slate-400 text-center align-middle"
+                        className="py-1.5 bg-slate-200 text-slate-800 font-black text-[14px] border-b border-slate-300 border-r-[2px] border-r-slate-400 text-center align-middle"
                       >
                         {m}월
                       </th>
                     ))}
                   </tr>
                   <tr className="h-[30px]">
+                    {/* 고정된 합계 하위 6개 열 헤더 */}
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'workDays' })}
-                      className="w-[40px] min-w-[40px] py-1 bg-emerald-100/80 text-slate-900 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[116px] z-50 w-[40px] min-w-[40px] py-1 bg-emerald-100 text-slate-900 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       근무
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'sojeong' })}
-                      className="w-[40px] min-w-[40px] py-1 bg-emerald-100/80 text-emerald-950 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[156px] z-50 w-[40px] min-w-[40px] py-1 bg-emerald-100 text-emerald-950 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       소정
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'jeolnal' })}
-                      className="w-[34px] min-w-[34px] py-1 bg-emerald-100/80 text-rose-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[196px] z-50 w-[34px] min-w-[34px] py-1 bg-emerald-100 text-rose-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       절
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'overtime' })}
-                      className="w-[36px] min-w-[36px] py-1 bg-emerald-100/80 text-orange-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[230px] z-50 w-[36px] min-w-[36px] py-1 bg-emerald-100 text-orange-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-emerald-200 transition-colors select-none align-middle text-center"
                     >
                       연장
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'extraTotal' })}
-                      className="w-[42px] min-w-[42px] py-1 bg-red-100/80 text-red-800 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r border-emerald-200 cursor-pointer hover:bg-red-200 transition-colors select-none align-middle text-center"
+                      className="sticky left-[266px] z-50 w-[42px] min-w-[42px] py-1 bg-red-100 text-red-800 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 shadow-[inset_-1px_0_0_#a7f3d0] cursor-pointer hover:bg-red-200 transition-colors select-none align-middle text-center"
                     >
                       추가합
                     </th>
                     <th
                       onClick={() => handleSort({ type: 'TOTAL', field: 'longShift' })}
-                      className="w-[42px] min-w-[42px] py-1 bg-amber-200/80 text-amber-950 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r-[2.5px] border-r-slate-700 cursor-pointer hover:bg-amber-300 transition-colors select-none align-middle text-center"
+                      className="sticky left-[308px] z-50 w-[42px] min-w-[42px] py-1 bg-amber-200 text-amber-950 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 shadow-[inset_-2.5px_0_0_#334155,2px_0_5px_-2px_rgba(0,0,0,0.12)] cursor-pointer hover:bg-amber-300 transition-colors select-none align-middle text-center"
                     >
                       긴근무
                     </th>
@@ -1005,31 +1007,31 @@ export default function StatisticsView() {
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'sojeong' })}
-                          className="w-[34px] min-w-[34px] py-1 bg-emerald-50/60 text-emerald-900 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-emerald-100 transition-colors select-none align-middle text-center"
+                          className="w-[34px] min-w-[34px] py-1 bg-emerald-50 text-emerald-900 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-emerald-100 transition-colors select-none align-middle text-center"
                         >
                           소정
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'jeolnal' })}
-                          className="w-[28px] min-w-[28px] text-center py-1 bg-rose-50/60 text-rose-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-rose-100 transition-colors select-none align-middle"
+                          className="w-[28px] min-w-[28px] text-center py-1 bg-rose-50 text-rose-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-rose-100 transition-colors select-none align-middle"
                         >
                           절
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'overtime' })}
-                          className="w-[32px] min-w-[32px] py-1 bg-orange-50/60 text-orange-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-orange-100 transition-colors select-none align-middle text-center"
+                          className="w-[32px] min-w-[32px] py-1 bg-orange-50 text-orange-700 font-extrabold text-[11.5px] border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-orange-100 transition-colors select-none align-middle text-center"
                         >
                           연장
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'extraTotal' })}
-                          className="w-[36px] min-w-[36px] py-1 bg-red-50/60 text-red-700 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-red-100 transition-colors select-none align-middle text-center"
+                          className="w-[36px] min-w-[36px] py-1 bg-red-50 text-red-700 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r border-slate-200 cursor-pointer hover:bg-red-100 transition-colors select-none align-middle text-center"
                         >
                           추가합
                         </th>
                         <th
                           onClick={() => handleSort({ type: 'MONTH', month: m, field: 'longShift' })}
-                          className="w-[38px] min-w-[38px] py-1 bg-amber-50/70 text-amber-900 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r-[2px] border-r-slate-400 cursor-pointer hover:bg-amber-100 transition-colors select-none align-middle text-center"
+                          className="w-[38px] min-w-[38px] py-1 bg-amber-50 text-amber-900 font-extrabold text-[11px] tracking-tighter border-b-[2.5px] border-b-slate-600 border-r-[2px] border-r-slate-400 cursor-pointer hover:bg-amber-100 transition-colors select-none align-middle text-center"
                         >
                           긴근무
                         </th>
@@ -1069,19 +1071,17 @@ export default function StatisticsView() {
 
                   {partialYearDrivers.length > 0 && (
                     <>
-                      <tr className="bg-slate-200/90 border-y-[2px] border-slate-500 h-[28px]">
+                      <tr className="bg-slate-200 border-y-[2px] border-slate-500 h-[28px]">
                         <td
-                          colSpan={isPrivate ? 3 : 2}
-                          className="sticky left-0 z-30 bg-slate-200 px-2.5 py-1 text-left font-black text-[12px] text-slate-700 shadow-[inset_2.5px_0_0_#334155,inset_-2px_0_0_#475569]"
+                          colSpan={stickyColCount}
+                          className="sticky left-0 z-30 bg-slate-200 px-2.5 py-1 text-left font-black text-[12px] text-slate-700 shadow-[inset_2.5px_0_0_#334155,inset_-2.5px_0_0_#334155]"
                         >
-                          ▼ 일부 월 근무 ({partialYearDrivers.length}명)
+                          ▼ 일부 월 근무 ({partialYearDrivers.length}명) · 중도 합류/이동/퇴사
                         </td>
                         <td
-                          colSpan={totalColSpan - (isPrivate ? 3 : 2)}
-                          className="px-3 py-1 text-left font-bold text-[12px] text-slate-600"
-                        >
-                          중도 합류 · 이동 · 퇴사 (전체 집계월 중 일부 월만 근무한 기사)
-                        </td>
+                          colSpan={totalColSpan - stickyColCount}
+                          className="px-3 py-1 text-left font-bold text-[12px] text-slate-600 bg-slate-200/90"
+                        />
                       </tr>
                       {partialYearDrivers.map((drv, idx) =>
                         isPrivate
